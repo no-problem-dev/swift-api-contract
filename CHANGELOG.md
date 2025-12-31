@@ -9,6 +9,14 @@
 
 <!-- 次のリリースに含める変更をここに追加 -->
 
+## [1.0.1] - 2025-12-31
+
+### 修正
+
+- **Linux サポート**
+  - `EndpointMacro.swift`: `String.replacingOccurrences` 使用のため `Foundation` をインポート
+  - `APIContract.swift`: `URLRequest` 使用のため `FoundationNetworking` を条件付きインポート
+
 ## [1.0.0] - 2025-12-31
 
 ### 追加
@@ -61,5 +69,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/no-problem-dev/swift-api-contract/releases/tag/v1.0.0
+
+<!-- Auto-generated on 2025-12-31T03:15:51Z by release workflow -->
