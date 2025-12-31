@@ -63,3 +63,5 @@
 
 [未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/no-problem-dev/swift-api-contract/releases/tag/v1.0.0
+
+<!-- Auto-generated on 2025-12-31T03:15:51Z by release workflow -->
