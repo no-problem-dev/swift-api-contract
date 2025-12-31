@@ -39,10 +39,22 @@
   - `init()`イニシャライザの自動生成
   - URLRequest構築の自動化
 
+### CI/CD
+
+- **GitHub Actions**
+  - `tests.yml`: PRごとのテスト自動実行
+  - `auto-release-on-merge.yml`: リリースブランチマージ時の自動リリース
+  - `docc.yml`: DocCドキュメントのGitHub Pagesデプロイ
+- **自動リリースフロー**
+  - CHANGELOGバリデーション
+  - Gitタグ自動作成
+  - GitHub Release自動生成
+  - 次バージョンリリースブランチ自動作成
+
 ### ドキュメント
 
 - README.md（日本語・英語）
-- DocCドキュメント
+- DocCドキュメント（GettingStarted、DefiningEndpoints）
 - CHANGELOG.md
 
 ### テスト
