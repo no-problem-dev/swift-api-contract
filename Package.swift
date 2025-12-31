@@ -1,0 +1,50 @@
+// swift-tools-version: 6.0
+import PackageDescription
+import CompilerPluginSupport
+
+let package = Package(
+    name: "swift-api-contract",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v14),
+        .tvOS(.v17),
+        .watchOS(.v10),
+    ],
+    products: [
+        // Main library for API contract definitions
+        .library(
+            name: "APIContract",
+            targets: ["APIContract"]
+        ),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
+    ],
+    targets: [
+        // MARK: - Macro Implementation
+        .macro(
+            name: "APIContractMacros",
+            dependencies: [
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+            ]
+        ),
+
+        // MARK: - Client Library
+        .target(
+            name: "APIContract",
+            dependencies: ["APIContractMacros"]
+        ),
+
+        // MARK: - Tests
+        .testTarget(
+            name: "APIContractMacrosTests",
+            dependencies: [
+                "APIContractMacros",
+                "APIContract",
+                .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
+            ]
+        ),
+    ]
+)
