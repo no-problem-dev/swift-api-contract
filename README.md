@@ -148,6 +148,24 @@ struct GetUser {
 @Body var body: CreateUserRequest
 ```
 
+### @APIServices
+
+複数のAPIサービスを一括登録します。
+
+```swift
+@APIServices
+struct AppServices {
+    let users: UsersService
+    let posts: PostsService
+}
+
+// 生成されるメソッド:
+// func registerAll<R: Routes>(_ routes: R) { ... }
+
+// 使用例:
+services.registerAll(server.routes)
+```
+
 ## HTTPメソッド
 
 | メソッド | 用途 |
@@ -180,7 +198,7 @@ struct GetUser {
 | `EmptyInput` | パラメータなしのエンドポイント用 |
 | `EmptyOutput` | レスポンスボディなしのエンドポイント用 |
 
-## APIExecutorの実装
+## APIExecutorの実装（クライアント）
 
 ```swift
 struct MyAPIClient: APIExecutor {
@@ -198,6 +216,31 @@ struct MyAPIClient: APIExecutor {
     where E.Output == EmptyOutput {
         let request = try endpoint.urlRequest(baseURL: baseURL)
         _ = try await session.data(for: request)
+    }
+}
+```
+
+## APIServiceの実装（サーバー）
+
+`@APIGroup`マクロは対応するServiceプロトコルを自動生成します。
+
+```swift
+// @APIGroup(path: "/v1/users", auth: .required)
+// enum UsersAPI { ... }
+// ↓ 自動生成
+// protocol UsersAPIService: APIService where Group == UsersAPI { ... }
+
+struct UsersService: UsersAPIService {
+    func handle(_ input: UsersAPI.List, context: ServiceContext) async throws -> [User] {
+        // 実装
+    }
+
+    func handle(_ input: UsersAPI.Get, context: ServiceContext) async throws -> User {
+        // 実装
+    }
+
+    func handle(_ input: UsersAPI.Create, context: ServiceContext) async throws -> User {
+        // 実装
     }
 }
 ```

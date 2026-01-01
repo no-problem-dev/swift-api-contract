@@ -148,6 +148,24 @@ Marks the request body.
 @Body var body: CreateUserRequest
 ```
 
+### @APIServices
+
+Groups multiple API services for bulk registration.
+
+```swift
+@APIServices
+struct AppServices {
+    let users: UsersService
+    let posts: PostsService
+}
+
+// Generated method:
+// func registerAll<R: Routes>(_ routes: R) { ... }
+
+// Usage:
+services.registerAll(server.routes)
+```
+
 ## HTTP Methods
 
 | Method | Usage |
@@ -180,7 +198,7 @@ Marks the request body.
 | `EmptyInput` | For endpoints without parameters |
 | `EmptyOutput` | For endpoints without response body |
 
-## Implementing APIExecutor
+## Implementing APIExecutor (Client)
 
 ```swift
 struct MyAPIClient: APIExecutor {
@@ -198,6 +216,31 @@ struct MyAPIClient: APIExecutor {
     where E.Output == EmptyOutput {
         let request = try endpoint.urlRequest(baseURL: baseURL)
         _ = try await session.data(for: request)
+    }
+}
+```
+
+## Implementing APIService (Server)
+
+The `@APIGroup` macro auto-generates a corresponding Service protocol.
+
+```swift
+// @APIGroup(path: "/v1/users", auth: .required)
+// enum UsersAPI { ... }
+// ↓ Auto-generated
+// protocol UsersAPIService: APIService where Group == UsersAPI { ... }
+
+struct UsersService: UsersAPIService {
+    func handle(_ input: UsersAPI.List, context: ServiceContext) async throws -> [User] {
+        // Implementation
+    }
+
+    func handle(_ input: UsersAPI.Get, context: ServiceContext) async throws -> User {
+        // Implementation
+    }
+
+    func handle(_ input: UsersAPI.Create, context: ServiceContext) async throws -> User {
+        // Implementation
     }
 }
 ```

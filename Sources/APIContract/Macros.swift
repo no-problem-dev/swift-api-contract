@@ -4,7 +4,7 @@
 ///
 /// enumに付与して、関連するエンドポイントをグループ化します。
 /// ベースパスと認証要件を指定できます。
-/// また、対応するHandlerプロトコルも自動生成されます。
+/// また、対応するServiceプロトコルも自動生成されます。
 ///
 /// ## 使用例
 /// ```swift
@@ -24,16 +24,19 @@
 ///     public static let basePath = "/v1/users"
 ///     public static let auth: AuthRequirement = .required
 ///     public static let endpoints: [EndpointDescriptor] = [...]
+///
+///     public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R
+///         where R.Group == UsersAPI, R.Service: UsersAPIService { ... }
 /// }
 ///
-/// public protocol UsersAPIHandler: APIGroupHandler where Group == UsersAPI {
-///     func handle(_ input: UsersAPI.List, context: HandlerContext) async throws -> [User]
-///     func handle(_ input: UsersAPI.Create, context: HandlerContext) async throws -> User
+/// public protocol UsersAPIService: APIService where Group == UsersAPI {
+///     func handle(_ input: UsersAPI.List, context: ServiceContext) async throws -> [User]
+///     func handle(_ input: UsersAPI.Create, context: ServiceContext) async throws -> User
 /// }
 /// ```
-@attached(member, names: named(basePath), named(auth), named(endpoints))
+@attached(member, names: named(basePath), named(auth), named(endpoints), named(registerAll))
 @attached(extension, conformances: APIContractGroup)
-@attached(peer, names: suffixed(Handler))
+@attached(peer, names: suffixed(Service))
 public macro APIGroup(
     path: String,
     auth: AuthRequirement = .required
@@ -144,3 +147,38 @@ public macro QueryParam(
 /// `@Body` は1つのエンドポイントに1つだけ指定できます。
 @attached(peer)
 public macro Body() = #externalMacro(module: "APIContractMacros", type: "BodyMacro")
+
+/// 複数のAPIサービスをグループ化するマクロ
+///
+/// structに付与して、複数のAPIサービスを一括登録できるようにします。
+/// 各プロパティはAPIServiceに準拠した型である必要があります。
+///
+/// ## 使用例
+/// ```swift
+/// @APIServices
+/// struct AppServices {
+///     let users: UsersService
+///     let posts: PostsService
+///     let comments: CommentsService
+/// }
+/// ```
+///
+/// ## 生成されるコード
+/// ```swift
+/// extension AppServices {
+///     func registerAll<R: Routes>(_ routes: R) {
+///         UsersService.Group.registerAll(routes.mount(users))
+///         PostsService.Group.registerAll(routes.mount(posts))
+///         CommentsService.Group.registerAll(routes.mount(comments))
+///     }
+/// }
+/// ```
+///
+/// ## routes.swift での使用
+/// ```swift
+/// func routes(_ server: VaporServerApplication, services: AppServices) throws {
+///     services.registerAll(server.routes)
+/// }
+/// ```
+@attached(member, names: named(registerAll))
+public macro APIServices() = #externalMacro(module: "APIContractMacros", type: "APIServicesMacro")

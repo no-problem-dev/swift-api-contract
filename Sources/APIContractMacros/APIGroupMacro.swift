@@ -5,7 +5,7 @@ import SwiftSyntaxMacros
 ///
 /// enumに付与して、関連するエンドポイントをグループ化します。
 /// `APIContractGroup`プロトコルへの準拠と、`basePath`・`auth`・`endpoints`プロパティを自動生成します。
-/// また、対応するHandlerプロトコルを自動生成します。
+/// また、対応するServiceプロトコルを自動生成します。
 public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
 
     // MARK: - MemberMacro
@@ -38,6 +38,10 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         // static let endpoints: [EndpointDescriptor]
         members.append(generateEndpointsProperty(for: endpointInfos))
 
+        // static func registerAll - 全エンドポイントを一括登録
+        let enumName = enumDecl.name.text
+        members.append(generateRegisterAllMethod(enumName: enumName, endpoints: endpointInfos))
+
         return members
     }
 
@@ -55,11 +59,12 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
             return []
         }
 
-        let extensionDecl: DeclSyntax = """
+        // APIContractGroup準拠の extension
+        let conformanceDecl: DeclSyntax = """
         extension \(type.trimmed): APIContractGroup {}
         """
 
-        guard let extensionDeclSyntax = extensionDecl.as(ExtensionDeclSyntax.self) else {
+        guard let extensionDeclSyntax = conformanceDecl.as(ExtensionDeclSyntax.self) else {
             return []
         }
 
@@ -83,8 +88,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         // @Endpoint付きstructを収集
         let endpointInfos = collectEndpoints(from: enumDecl)
 
-        // Handlerプロトコルを生成
-        return [generateHandlerProtocol(enumName: enumName, endpoints: endpointInfos)]
+        // Serviceプロトコルを生成（PeerMacroで生成可能）
+        return [generateServiceProtocol(enumName: enumName, endpoints: endpointInfos)]
     }
 
     // MARK: - Private Helpers
@@ -210,13 +215,13 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         """)
     }
 
-    /// Handlerプロトコルを生成
-    private static func generateHandlerProtocol(enumName: String, endpoints: [EndpointInfo]) -> DeclSyntax {
-        let handlerProtocolName = "\(enumName)Handler"
+    /// Serviceプロトコルを生成
+    private static func generateServiceProtocol(enumName: String, endpoints: [EndpointInfo]) -> DeclSyntax {
+        let serviceProtocolName = "\(enumName)Service"
 
         if endpoints.isEmpty {
             return DeclSyntax(stringLiteral: """
-            public protocol \(handlerProtocolName): APIGroupHandler where Group == \(enumName) {
+            public protocol \(serviceProtocolName): APIService where Group == \(enumName) {
             }
             """)
         }
@@ -225,13 +230,46 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
             let returnType = endpoint.outputType == "Void" || endpoint.outputType == "EmptyOutput"
                 ? ""
                 : " -> \(endpoint.outputType)"
-            return "    func handle(_ input: \(enumName).\(endpoint.name), context: HandlerContext) async throws\(returnType)"
+            return "    func handle(_ input: \(enumName).\(endpoint.name), context: ServiceContext) async throws\(returnType)"
         }.joined(separator: "\n")
 
         return DeclSyntax(stringLiteral: """
-        public protocol \(handlerProtocolName): APIGroupHandler where Group == \(enumName) {
+        public protocol \(serviceProtocolName): APIService where Group == \(enumName) {
         \(handleMethods)
         }
+        """)
+    }
+
+    /// registerAll static メソッドを生成
+    private static func generateRegisterAllMethod(enumName: String, endpoints: [EndpointInfo]) -> DeclSyntax {
+        let serviceProtocolName = "\(enumName)Service"
+
+        if endpoints.isEmpty {
+            return DeclSyntax(stringLiteral: """
+            @discardableResult
+                public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == \(enumName), R.Service: \(serviceProtocolName) {
+                    return routes
+                }
+            """)
+        }
+
+        // 各エンドポイントの登録コードを生成
+        let registrations = endpoints.enumerated().map { (index, endpoint) in
+            let isFirst = index == 0
+            let prefix = isFirst ? "routes" : ""
+            return """
+            \(prefix).register(\(enumName).\(endpoint.name).self) { input, ctx in
+                        try await routes.service.handle(input, context: ctx)
+                    }
+            """
+        }.joined(separator: "\n            ")
+
+        return DeclSyntax(stringLiteral: """
+        @discardableResult
+            public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == \(enumName), R.Service: \(serviceProtocolName) {
+                \(registrations)
+                return routes
+            }
         """)
     }
 }
