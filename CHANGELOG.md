@@ -9,6 +9,24 @@
 
 <!-- 次のリリースに含める変更をここに追加 -->
 
+## [1.0.2] - 2026-01-01
+
+### 追加
+
+- **サーバーサイドハンドラプロトコル**
+  - `APIGroupHandler`: 型安全なAPIハンドラプロトコル
+  - `AuthenticationProvider`: 認証抽象化プロトコル
+  - `HandlerContext`: 認証済みユーザーコンテキスト
+
+- **エラーハンドリング**
+  - `APIContractError`: 標準化されたエラー型（unauthorized, forbidden, notFound, badRequest, conflict, internalError）
+
+### 変更
+
+- `HTTPMethod` を `APIMethod` にリネーム
+- `@Endpoint` マクロに `authRequirement` パラメータを追加
+- `AuthRequirement` enum を追加（none, required）
+
 ## [1.0.1] - 2025-12-31
 
 ### 修正
@@ -69,7 +87,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/no-problem-dev/swift-api-contract/releases/tag/v1.0.0
 
