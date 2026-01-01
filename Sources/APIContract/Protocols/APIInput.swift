@@ -3,6 +3,7 @@ import Foundation
 /// APIリクエストの入力を表すプロトコル
 ///
 /// パスパラメータ、クエリパラメータ、リクエストボディを統一的に扱います。
+/// クライアント側ではリクエスト構築に、サーバー側ではリクエスト解析に使用します。
 ///
 /// ## 例
 /// ```swift
@@ -15,6 +16,8 @@ import Foundation
 /// }
 /// ```
 public protocol APIInput: Sendable, Encodable {
+    // MARK: - Client-side Encoding
+
     /// パスパラメータを返す
     ///
     /// パステンプレート内の `:paramName` を置換するために使用されます。
@@ -33,6 +36,23 @@ public protocol APIInput: Sendable, Encodable {
     /// - Parameter encoder: 使用するJSONEncoder
     /// - Returns: エンコードされたData、またはボディがない場合はnil
     func encodeBody(using encoder: JSONEncoder) throws -> Data?
+
+    // MARK: - Server-side Decoding
+
+    /// サーバーサイドでリクエストからInputをデコード
+    ///
+    /// - Parameters:
+    ///   - pathParameters: URLパスから抽出されたパラメータ
+    ///   - queryParameters: URLクエリ文字列から抽出されたパラメータ
+    ///   - body: リクエストボディのData（存在する場合）
+    ///   - decoder: JSONDecoder
+    /// - Returns: デコードされたInput
+    static func decode(
+        pathParameters: [String: String],
+        queryParameters: [String: String],
+        body: Data?,
+        decoder: JSONDecoder
+    ) throws -> Self
 }
 
 // MARK: - Default Implementations

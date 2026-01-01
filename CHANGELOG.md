@@ -37,7 +37,7 @@
 - **型ユーティリティ**
   - `EmptyInput`: パラメータなしエンドポイント用
   - `EmptyOutput`: レスポンスボディなしエンドポイント用
-  - `HTTPMethod`: GET、POST、PUT、DELETE、PATCH、HEAD、OPTIONS
+  - `APIMethod`: GET、POST、PUT、DELETE、PATCH、HEAD、OPTIONS
   - `AuthRequirement`: none、required
 
 - **自動コード生成**

@@ -4,6 +4,7 @@
 ///
 /// enumに付与して、関連するエンドポイントをグループ化します。
 /// ベースパスと認証要件を指定できます。
+/// また、対応するHandlerプロトコルも自動生成されます。
 ///
 /// ## 使用例
 /// ```swift
@@ -22,11 +23,17 @@
 /// public enum UsersAPI {
 ///     public static let basePath = "/v1/users"
 ///     public static let auth: AuthRequirement = .required
-///     // ... 子エンドポイント
+///     public static let endpoints: [EndpointDescriptor] = [...]
+/// }
+///
+/// public protocol UsersAPIHandler: APIGroupHandler where Group == UsersAPI {
+///     func handle(_ input: UsersAPI.List, context: HandlerContext) async throws -> [User]
+///     func handle(_ input: UsersAPI.Create, context: HandlerContext) async throws -> User
 /// }
 /// ```
-@attached(member, names: named(basePath), named(auth))
+@attached(member, names: named(basePath), named(auth), named(endpoints))
 @attached(extension, conformances: APIContractGroup)
+@attached(peer, names: suffixed(Handler))
 public macro APIGroup(
     path: String,
     auth: AuthRequirement = .required
@@ -71,10 +78,11 @@ public macro APIGroup(
     named(pathParameters),
     named(queryParameters),
     named(encodeBody),
-    named(init)
+    named(init),
+    named(decode)
 )
 public macro Endpoint(
-    _ method: HTTPMethod,
+    _ method: APIMethod,
     path: String = ""
 ) = #externalMacro(module: "APIContractMacros", type: "EndpointMacro")
 

@@ -1,5 +1,7 @@
 /// HTTPメソッドを表す列挙型
-public enum HTTPMethod: String, Sendable, Codable, CaseIterable {
+///
+/// NIOHTTP1.HTTPMethodとの名前衝突を避けるため、`APIMethod`として定義。
+public enum APIMethod: String, Sendable, Codable, CaseIterable {
     case get = "GET"
     case post = "POST"
     case put = "PUT"

@@ -34,7 +34,7 @@ final class EndpointMacroTests: XCTestCase {
 
                 public typealias Input = Self
 
-                public static let method: HTTPMethod = .get
+                public static let method: APIMethod = .get
 
                 public static let subPath: String = "/v1/users"
 
@@ -51,6 +51,15 @@ final class EndpointMacroTests: XCTestCase {
                 }
 
                 public init() {
+                }
+
+                public static func decode(
+                    pathParameters: [String: String],
+                    queryParameters: [String: String],
+                    body: Data?,
+                    decoder: JSONDecoder
+                ) throws -> Self {
+                    Self()
                 }
             }
 
@@ -81,7 +90,7 @@ final class EndpointMacroTests: XCTestCase {
 
                 public typealias Input = Self
 
-                public static let method: HTTPMethod = .get
+                public static let method: APIMethod = .get
 
                 public static let subPath: String = "/v1/users/:userId"
 
@@ -99,6 +108,18 @@ final class EndpointMacroTests: XCTestCase {
 
                 public init(userId: String) {
                     self.userId = userId
+                }
+
+                public static func decode(
+                    pathParameters: [String: String],
+                    queryParameters: [String: String],
+                    body: Data?,
+                    decoder: JSONDecoder
+                ) throws -> Self {
+                    guard let userId = pathParameters["userId"] else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: userId"))
+                    }
+                    return Self(userId: userId)
                 }
             }
 
@@ -131,7 +152,7 @@ final class EndpointMacroTests: XCTestCase {
 
                 public typealias Input = Self
 
-                public static let method: HTTPMethod = .get
+                public static let method: APIMethod = .get
 
                 public static let subPath: String = "/v1/users"
 
@@ -157,6 +178,21 @@ final class EndpointMacroTests: XCTestCase {
                 public init(limit: Int? = nil, offset: Int? = nil) {
                     self.limit = limit
                     self.offset = offset
+                }
+
+                public static func decode(
+                    pathParameters: [String: String],
+                    queryParameters: [String: String],
+                    body: Data?,
+                    decoder: JSONDecoder
+                ) throws -> Self {
+                    let limit = queryParameters["limit"].flatMap {
+                        Int($0)
+                    }
+                    let offset = queryParameters["offset"].flatMap {
+                        Int($0)
+                    }
+                    return Self(limit: limit, offset: offset)
                 }
             }
 
@@ -187,7 +223,7 @@ final class EndpointMacroTests: XCTestCase {
 
                 public typealias Input = Self
 
-                public static let method: HTTPMethod = .post
+                public static let method: APIMethod = .post
 
                 public static let subPath: String = "/v1/users"
 
@@ -205,6 +241,19 @@ final class EndpointMacroTests: XCTestCase {
 
                 public init(input: CreateUserInput) {
                     self.input = input
+                }
+
+                public static func decode(
+                    pathParameters: [String: String],
+                    queryParameters: [String: String],
+                    body: Data?,
+                    decoder: JSONDecoder
+                ) throws -> Self {
+                    guard let bodyData = body else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing request body"))
+                    }
+                    let input = try decoder.decode(CreateUserInput.self, from: bodyData)
+                    return Self(input: input)
                 }
             }
 
@@ -234,6 +283,11 @@ final class EndpointMacroTests: XCTestCase {
                 public static let basePath: String = "/v1/users"
 
                 public static let auth: AuthRequirement = .required
+
+                public static let endpoints: [EndpointDescriptor] = []
+            }
+
+            public protocol UsersAPIHandler: APIGroupHandler where Group == UsersAPI {
             }
 
             extension UsersAPI: APIContractGroup {
@@ -260,6 +314,11 @@ final class EndpointMacroTests: XCTestCase {
                 public static let basePath: String = "/v1/public"
 
                 public static let auth: AuthRequirement = .optional
+
+                public static let endpoints: [EndpointDescriptor] = []
+            }
+
+            public protocol PublicAPIHandler: APIGroupHandler where Group == PublicAPI {
             }
 
             extension PublicAPI: APIContractGroup {
@@ -298,7 +357,7 @@ final class EndpointMacroTests: XCTestCase {
 
                     public typealias Group = UsersAPI
 
-                    public static let method: HTTPMethod = .get
+                    public static let method: APIMethod = .get
 
                     public static let subPath: String = ":userId"
 
@@ -316,6 +375,18 @@ final class EndpointMacroTests: XCTestCase {
 
                     public init(userId: String) {
                         self.userId = userId
+                    }
+
+                    public static func decode(
+                        pathParameters: [String: String],
+                        queryParameters: [String: String],
+                        body: Data?,
+                        decoder: JSONDecoder
+                    ) throws -> Self {
+                        guard let userId = pathParameters["userId"] else {
+                            throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: userId"))
+                        }
+                        return Self(userId: userId)
                     }
                 }
             }
