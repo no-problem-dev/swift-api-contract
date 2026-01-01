@@ -120,7 +120,7 @@ struct GetUser {
 
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
-| `method` | `HTTPMethod` | HTTPメソッド |
+| `method` | `APIMethod` | HTTPメソッド |
 | `path` | `String?` | サブパス（オプション） |
 
 ### @PathParam

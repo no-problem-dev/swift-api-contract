@@ -5,7 +5,7 @@ import FoundationNetworking
 
 /// API契約を表すプロトコル
 ///
-/// エンドポイントのHTTPメソッド、パス、入出力型を型レベルで定義します。
+/// エンドポイントのHTTPメソッド、パス、入出力型、エラー型を型レベルで定義します。
 /// これにより、クライアント（iOS）とサーバー（Backend）で同一の契約を共有し、
 /// コンパイル時に整合性を検証できます。
 ///
@@ -17,12 +17,14 @@ import FoundationNetworking
 ///     struct List {
 ///         @QueryParam var limit: Int?
 ///         typealias Output = [User]
+///         typealias Failure = UsersAPIError
 ///     }
 ///
 ///     @Endpoint(.get, path: ":userId")
 ///     struct Get {
 ///         @PathParam var userId: String
 ///         typealias Output = User
+///         typealias Failure = UsersAPIError
 ///     }
 /// }
 /// ```
@@ -36,8 +38,11 @@ public protocol APIContract: Sendable {
     /// 出力型（レスポンス）
     associatedtype Output: Decodable & Sendable
 
+    /// エラー型（このエンドポイントが返しうるビジネスエラー）
+    associatedtype Failure: APIContractError = NoContractError
+
     /// HTTPメソッド
-    static var method: HTTPMethod { get }
+    static var method: APIMethod { get }
 
     /// サブパス（グループのベースパスからの相対パス）
     ///
@@ -114,7 +119,7 @@ extension APIContract where Input == Self, Self: APIInput {
             url: baseURL.appendingPathComponent(path),
             resolvingAgainstBaseURL: true
         ) else {
-            throw APIContractError.invalidURL(path: path)
+            throw ContractBuildError.invalidURL(path: path)
         }
 
         if let query = queryParameters, !query.isEmpty {
@@ -122,7 +127,7 @@ extension APIContract where Input == Self, Self: APIInput {
         }
 
         guard let url = urlComponents.url else {
-            throw APIContractError.invalidURL(path: path)
+            throw ContractBuildError.invalidURL(path: path)
         }
 
         var request = URLRequest(url: url)
@@ -175,10 +180,10 @@ extension JSONEncoder {
     }
 }
 
-// MARK: - Errors
+// MARK: - Contract Build Errors
 
-/// APIContract関連のエラー
-public enum APIContractError: Error, LocalizedError {
+/// リクエスト構築時のエラー（クライアント側）
+public enum ContractBuildError: Error, LocalizedError {
     case invalidURL(path: String)
 
     public var errorDescription: String? {

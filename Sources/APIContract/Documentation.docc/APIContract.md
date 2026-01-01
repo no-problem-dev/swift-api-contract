@@ -72,7 +72,7 @@ let user: User = try await endpoint.execute(using: client)
 
 ### 型
 
-- ``HTTPMethod``
+- ``APIMethod``
 - ``AuthRequirement``
 - ``EmptyInput``
 - ``EmptyOutput``
