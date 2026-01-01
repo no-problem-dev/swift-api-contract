@@ -9,6 +9,24 @@
 
 <!-- 次のリリースに含める変更をここに追加 -->
 
+## [1.0.3] - 2026-01-01
+
+### 追加
+
+- **@APIServices マクロ**
+  - 複数のAPIサービスを一括登録するマクロ
+  - `registerAll<R: Routes>(_ routes: R)` メソッドを自動生成
+
+- **APIRouteRegistrar プロトコル**
+  - ルート登録のための型安全な抽象化
+
+### 変更
+
+- **Handler → Service リネーム**
+  - `APIGroupHandler` → `APIService`
+  - `APIRouteRegistrar.Handler` → `APIRouteRegistrar.Service`
+  - `@APIGroup` マクロが生成するプロトコル名を `XxxHandler` → `XxxService` に変更
+
 ## [1.0.2] - 2026-01-01
 
 ### 追加
@@ -87,7 +105,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.2...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/no-problem-dev/swift-api-contract/releases/tag/v1.0.0
