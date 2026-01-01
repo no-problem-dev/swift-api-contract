@@ -1,9 +1,9 @@
 import Foundation
 
-/// ハンドラー実行時のコンテキスト
+/// サービス実行時のコンテキスト
 ///
 /// 認証状態に応じて異なるコンテキストが提供されます。
-public enum HandlerContext: Sendable {
+public enum ServiceContext: Sendable {
     /// 認証不要のリクエスト
     case anonymous
 
@@ -28,10 +28,10 @@ public enum HandlerContext: Sendable {
     }
 }
 
-/// APIグループのハンドラー基底プロトコル
+/// APIグループのサービス基底プロトコル
 ///
-/// `@APIGroup` マクロが各APIグループに対応する具体的なハンドラープロトコルを生成します。
-/// 生成されるプロトコルはこの `APIGroupHandler` を継承します。
+/// `@APIGroup` マクロが各APIグループに対応する具体的なサービスプロトコルを生成します。
+/// 生成されるプロトコルはこの `APIService` を継承します。
 ///
 /// ## 生成されるコード例
 /// ```swift
@@ -39,13 +39,13 @@ public enum HandlerContext: Sendable {
 /// public enum ActivitiesAPI { ... }
 ///
 /// // ↓ マクロが自動生成
-/// public protocol ActivitiesAPIHandler: APIGroupHandler where Group == ActivitiesAPI {
-///     func handle(_ input: ActivitiesAPI.List, context: HandlerContext) async throws -> [WorkoutActivity]
-///     func handle(_ input: ActivitiesAPI.Get, context: HandlerContext) async throws -> WorkoutActivity
+/// public protocol ActivitiesAPIService: APIService where Group == ActivitiesAPI {
+///     func handle(_ input: ActivitiesAPI.List, context: ServiceContext) async throws -> [WorkoutActivity]
+///     func handle(_ input: ActivitiesAPI.Get, context: ServiceContext) async throws -> WorkoutActivity
 ///     // ...
 /// }
 /// ```
-public protocol APIGroupHandler: Sendable {
+public protocol APIService: Sendable {
     /// 対応するAPIグループ型
     associatedtype Group: APIContractGroup
 }
@@ -55,5 +55,5 @@ public protocol APIGroupHandler: Sendable {
 /// サーバーフレームワーク統合時に、任意のエンドポイントをディスパッチするために使用します。
 public protocol AnyEndpointDispatcher: Sendable {
     /// 型消去されたエンドポイントをディスパッチ
-    func dispatchAny(_ input: any APIInput, context: HandlerContext) async throws -> any Sendable
+    func dispatchAny(_ input: any APIInput, context: ServiceContext) async throws -> any Sendable
 }
