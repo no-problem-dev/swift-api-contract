@@ -39,8 +39,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             members.append("public typealias Group = \(raw: groupName)")
         }
 
-        // static let method: HTTPMethod
-        members.append("public static let method: HTTPMethod = .\(raw: arguments.method)")
+        // static let method: APIMethod
+        members.append("public static let method: APIMethod = .\(raw: arguments.method)")
 
         // static let subPath: String
         members.append("public static let subPath: String = \"\(raw: arguments.path)\"")
@@ -66,6 +66,9 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
 
         // init
         members.append(generateInitializer(for: properties))
+
+        // static func decode(...) - サーバーサイドデコーディング
+        members.append(generateDecodeMethod(for: properties))
 
         return members
     }
@@ -299,6 +302,161 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         }
         """)
     }
+
+    /// サーバーサイドデコーディング用のdecodeメソッドを生成
+    private static func generateDecodeMethod(for properties: [PropertyInfo]) -> DeclSyntax {
+        if properties.isEmpty {
+            return """
+            public static func decode(
+                pathParameters: [String: String],
+                queryParameters: [String: String],
+                body: Data?,
+                decoder: JSONDecoder
+            ) throws -> Self {
+                Self()
+            }
+            """
+        }
+
+        var lines: [String] = []
+        lines.append("public static func decode(")
+        lines.append("    pathParameters: [String: String],")
+        lines.append("    queryParameters: [String: String],")
+        lines.append("    body: Data?,")
+        lines.append("    decoder: JSONDecoder")
+        lines.append(") throws -> Self {")
+
+        // 各プロパティをデコード
+        for prop in properties {
+            switch prop.kind {
+            case .pathParam:
+                lines.append(generatePathParamDecoding(for: prop))
+            case .queryParam:
+                lines.append(generateQueryParamDecoding(for: prop))
+            case .body:
+                lines.append(generateBodyDecoding(for: prop))
+            }
+        }
+
+        // イニシャライザを呼び出し
+        let initArgs = properties.map { "\($0.name): \($0.name)" }.joined(separator: ", ")
+        lines.append("    return Self(\(initArgs))")
+        lines.append("}")
+
+        return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
+    }
+
+    /// パスパラメータのデコーディングコードを生成
+    private static func generatePathParamDecoding(for prop: PropertyInfo) -> String {
+        let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
+
+        if prop.isOptional {
+            if baseType == "String" {
+                return "    let \(prop.name) = pathParameters[\"\(prop.name)\"]"
+            } else {
+                return "    let \(prop.name) = pathParameters[\"\(prop.name)\"].flatMap { \(generateValueConversion(from: "$0", to: baseType)) }"
+            }
+        } else {
+            if baseType == "String" {
+                // String型の場合は変換不要
+                return """
+                    guard let \(prop.name) = pathParameters["\(prop.name)"] else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: \(prop.name)"))
+                    }
+                """
+            } else {
+                // 他の型は変換が必要
+                return """
+                    guard let \(prop.name)String = pathParameters["\(prop.name)"],
+                          let \(prop.name) = \(generateValueConversion(from: "\(prop.name)String", to: baseType)) else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: \(prop.name)"))
+                    }
+                """
+            }
+        }
+    }
+
+    /// クエリパラメータのデコーディングコードを生成
+    private static func generateQueryParamDecoding(for prop: PropertyInfo) -> String {
+        let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
+
+        if prop.isOptional {
+            if baseType == "String" {
+                return "    let \(prop.name) = queryParameters[\"\(prop.queryName)\"]"
+            } else {
+                return "    let \(prop.name) = queryParameters[\"\(prop.queryName)\"].flatMap { \(generateValueConversion(from: "$0", to: baseType)) }"
+            }
+        } else if let defaultValue = prop.defaultValue {
+            if baseType == "String" {
+                return "    let \(prop.name) = queryParameters[\"\(prop.queryName)\"] ?? \(defaultValue)"
+            } else {
+                return "    let \(prop.name) = queryParameters[\"\(prop.queryName)\"].flatMap { \(generateValueConversion(from: "$0", to: baseType)) } ?? \(defaultValue)"
+            }
+        } else {
+            if baseType == "String" {
+                // String型の場合は変換不要
+                return """
+                    guard let \(prop.name) = queryParameters["\(prop.queryName)"] else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing query parameter: \(prop.queryName)"))
+                    }
+                """
+            } else {
+                // 他の型は変換が必要
+                return """
+                    guard let \(prop.name)String = queryParameters["\(prop.queryName)"],
+                          let \(prop.name) = \(generateValueConversion(from: "\(prop.name)String", to: baseType)) else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing query parameter: \(prop.queryName)"))
+                    }
+                """
+            }
+        }
+    }
+
+    /// ボディのデコーディングコードを生成
+    private static func generateBodyDecoding(for prop: PropertyInfo) -> String {
+        if prop.isOptional {
+            return """
+                let \(prop.name): \(prop.typeName)
+                if let bodyData = body {
+                    \(prop.name) = try decoder.decode(\(prop.typeName.replacingOccurrences(of: "?", with: "")).self, from: bodyData)
+                } else {
+                    \(prop.name) = nil
+                }
+            """
+        } else {
+            return """
+                guard let bodyData = body else {
+                    throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing request body"))
+                }
+                let \(prop.name) = try decoder.decode(\(prop.typeName).self, from: bodyData)
+            """
+        }
+    }
+
+    /// 文字列から型への変換コードを生成
+    private static func generateValueConversion(from source: String, to typeName: String) -> String {
+        switch typeName {
+        case "String":
+            return source
+        case "Int":
+            return "Int(\(source))"
+        case "Int64":
+            return "Int64(\(source))"
+        case "Int32":
+            return "Int32(\(source))"
+        case "Double":
+            return "Double(\(source))"
+        case "Float":
+            return "Float(\(source))"
+        case "Bool":
+            return "Bool(\(source))"
+        case "Date":
+            return "ISO8601DateFormatter().date(from: \(source))"
+        default:
+            // RawRepresentable (enum) と仮定
+            return "\(typeName)(rawValue: \(source))"
+        }
+    }
 }
 
 // MARK: - Supporting Types
@@ -334,7 +492,7 @@ enum EndpointMacroError: Error, CustomStringConvertible {
         case .onlyApplicableToStruct:
             return "@Endpoint can only be applied to structs"
         case .invalidArguments:
-            return "@Endpoint requires a valid HTTPMethod argument"
+            return "@Endpoint requires a valid APIMethod argument"
         }
     }
 }

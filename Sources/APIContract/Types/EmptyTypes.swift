@@ -15,6 +15,15 @@ import Foundation
 /// ```
 public struct EmptyInput: APIInput, Codable {
     public init() {}
+
+    public static func decode(
+        pathParameters: [String: String],
+        queryParameters: [String: String],
+        body: Data?,
+        decoder: JSONDecoder
+    ) throws -> Self {
+        Self()
+    }
 }
 
 /// 空の出力型（レスポンスボディがないエンドポイント用）
