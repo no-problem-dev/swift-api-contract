@@ -7,7 +7,21 @@
 
 ## [未リリース]
 
-<!-- 次のリリースに含める変更をここに追加 -->
+なし
+
+## [1.0.4] - 2026-01-02
+
+### 変更
+
+- **Swift 6.2 対応**: Swift 6.2 安定版に対応
+  - `swift-tools-version`: 6.0 → 6.2
+  - `swift-syntax`: 600.0.0 → 602.0.0
+  - 依存関係指定を `.upToNextMajor` に統一
+
+### 追加
+
+- **CI テストワークフロー**: Linux x86_64 でのテストを追加
+  - Linux x86_64 (swift:6.2-bookworm)
 
 ## [1.0.3] - 2026-01-01
 
@@ -105,7 +119,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.3...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...v1.0.1
@@ -116,3 +131,5 @@
 <!-- Auto-generated on 2025-12-31T08:03:40Z by release workflow -->
 
 <!-- Auto-generated on 2026-01-01T05:49:57Z by release workflow -->
+
+<!-- Auto-generated on 2026-01-01T12:25:13Z by release workflow -->
