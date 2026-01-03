@@ -9,6 +9,25 @@
 
 なし
 
+## [1.0.6] - 2026-01-03
+
+### 修正
+
+- **resolvePath プロトコル要件化**: ジェネリック呼び出し時のカスタム実装サポート
+  - `resolvePath(with:)` をプロトコル拡張のみからプロトコル要件に変更
+  - ジェネリック制約経由（`E: APIContract`）でもカスタム実装が正しく呼び出されるように修正
+  - デフォルト実装は維持し、後方互換性を確保
+
+### 追加
+
+- **APIContract テスト**: 22個の新規テストを追加
+  - `pathTemplate` テスト
+  - `resolvePath` デフォルト実装テスト
+  - カスタム `resolvePath` テスト（直接呼び出し・ジェネリック呼び出し）
+  - `buildRequest` テスト
+  - `APIMethod`、`AuthRequirement`、`EmptyOutput`、`EmptyInput` テスト
+  - `APIInput`、`APIContractGroup`、`EndpointDescriptor` テスト
+
 ## [1.0.5] - 2026-01-03
 
 ### 変更
@@ -135,7 +154,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.5...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.2...v1.0.3
