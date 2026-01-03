@@ -2,36 +2,15 @@ import Foundation
 
 /// 認証プロバイダープロトコル
 ///
-/// トークンを検証してユーザーIDを返す責務を持ちます。
-/// Firebase Auth, Auth0, JWTなど様々な認証システムに対応できます。
-///
-/// ## 実装例
-/// ```swift
-/// struct FirebaseAuthProvider: AuthenticationProvider {
-///     let authClient: AuthClient
-///
-///     func verifyToken(_ token: String) async throws -> String {
-///         let verified = try await authClient.verifyToken(token)
-///         return verified.uid
-///     }
-/// }
-/// ```
+/// トークンを検証してユーザーIDを返します。
 public protocol AuthenticationProvider: Sendable {
-    /// トークンを検証してユーザーIDを返す
-    ///
-    /// - Parameter token: Bearerトークン（"Bearer "プレフィックスは除去済み）
-    /// - Returns: 認証済みユーザーID
-    /// - Throws: 認証失敗時は`AuthenticationError`またはカスタムエラー
     func verifyToken(_ token: String) async throws -> String
 }
 
 /// 認証エラー
 public enum AuthenticationError: APIContractError {
-    /// トークンが不正または期限切れ
     case invalidToken(String)
-    /// トークンが提供されていない
     case missingToken
-    /// その他の認証エラー
     case authenticationFailed(String)
 
     public var statusCode: Int { 401 }

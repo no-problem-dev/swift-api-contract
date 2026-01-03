@@ -2,60 +2,14 @@ import Foundation
 
 /// API契約エラーを表すプロトコル
 ///
-/// 各ドメインのエラー型がこのプロトコルに準拠することで、
-/// クライアント・サーバー間で一貫したエラーハンドリングが可能になります。
-///
-/// ## 使用例
-/// ```swift
-/// enum ActivitiesAPIError: APIContractError {
-///     case notFound(activityId: String)
-///     case outsideMutablePeriod
-///
-///     var statusCode: Int {
-///         switch self {
-///         case .notFound: return 404
-///         case .outsideMutablePeriod: return 403
-///         }
-///     }
-///
-///     var errorCode: String {
-///         switch self {
-///         case .notFound: return "ACTIVITY_NOT_FOUND"
-///         case .outsideMutablePeriod: return "PERIOD_LOCKED"
-///         }
-///     }
-///
-///     var message: String {
-///         switch self {
-///         case .notFound(let id): return "Activity '\(id)' not found"
-///         case .outsideMutablePeriod: return "Cannot modify activity outside mutable period"
-///         }
-///     }
-/// }
-/// ```
+/// クライアント・サーバー間で一貫したエラーハンドリングを提供します。
 public protocol APIContractError: Error, Codable, Sendable {
-    /// HTTPステータスコード
     var statusCode: Int { get }
-
-    /// エラーコード（クライアント側での識別用）
     var errorCode: String { get }
-
-    /// 人間可読なメッセージ
     var message: String { get }
 }
 
-// MARK: - Error Response
-
 /// エラーレスポンスの共通JSON形式
-///
-/// サーバーからクライアントへのエラーレスポンスはこの形式で送信されます。
-/// ```json
-/// {
-///   "errorCode": "ACTIVITY_NOT_FOUND",
-///   "message": "Activity 'abc123' not found",
-///   "details": { "activityId": "abc123" }
-/// }
-/// ```
 public struct ErrorResponse: Codable, Sendable, Equatable {
     public let errorCode: String
     public let message: String
@@ -68,18 +22,13 @@ public struct ErrorResponse: Codable, Sendable, Equatable {
     }
 }
 
-// MARK: - APIContractError → ErrorResponse
-
 extension APIContractError {
-    /// ErrorResponseに変換
     public func toErrorResponse(details: [String: String]? = nil) -> ErrorResponse {
         ErrorResponse(errorCode: errorCode, message: message, details: details)
     }
 }
 
-// MARK: - Standard HTTP Errors
-
-/// 標準HTTPエラー（ドメイン固有でない汎用エラー）
+/// 標準HTTPエラー
 public enum HTTPError: APIContractError {
     case badRequest(String)
     case unauthorized
@@ -121,8 +70,6 @@ public enum HTTPError: APIContractError {
         }
     }
 }
-
-// MARK: - No Contract Error
 
 /// エラー定義がないエンドポイント用のデフォルトエラー型
 public enum NoContractError: APIContractError {

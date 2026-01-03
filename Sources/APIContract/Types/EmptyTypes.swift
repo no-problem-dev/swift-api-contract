@@ -1,18 +1,6 @@
 import Foundation
 
-/// 空の入力型（パラメータなしのエンドポイント用）
-///
-/// エンドポイントがパスパラメータ、クエリパラメータ、ボディを
-/// 一切必要としない場合に使用します。
-///
-/// ## 例
-/// ```swift
-/// @Endpoint(.get)
-/// struct Health {
-///     typealias Input = EmptyInput
-///     typealias Output = HealthStatus
-/// }
-/// ```
+/// 空の入力型
 public struct EmptyInput: APIInput, Codable {
     public init() {}
 
@@ -26,23 +14,9 @@ public struct EmptyInput: APIInput, Codable {
     }
 }
 
-/// 空の出力型（レスポンスボディがないエンドポイント用）
-///
-/// DELETEリクエストなど、成功時にレスポンスボディを返さない
-/// エンドポイントに使用します。
-///
-/// ## 例
-/// ```swift
-/// @Endpoint(.delete, path: ":userId")
-/// struct Delete {
-///     @PathParam var userId: String
-///     typealias Output = EmptyOutput
-/// }
-/// ```
+/// 空の出力型
 public struct EmptyOutput: Decodable, Sendable, Equatable {
     public init() {}
 
-    public init(from decoder: Decoder) throws {
-        // 空のJSONオブジェクト {} または空レスポンスを許容
-    }
+    public init(from decoder: Decoder) throws {}
 }
