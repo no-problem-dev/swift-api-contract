@@ -13,6 +13,12 @@ public protocol APIContract: Sendable {
     static var method: APIMethod { get }
     static var subPath: String { get }
     static var auth: AuthRequirement { get }
+
+    /// 入力からパスを解決する
+    ///
+    /// デフォルト実装は`pathTemplate`のパスパラメータを置換する。
+    /// カスタム実装でオーバーライド可能。
+    static func resolvePath(with input: Input) -> String
 }
 
 extension APIContract {

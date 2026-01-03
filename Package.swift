@@ -40,6 +40,10 @@ let package = Package(
 
         // MARK: - Tests
         .testTarget(
+            name: "APIContractTests",
+            dependencies: ["APIContract"]
+        ),
+        .testTarget(
             name: "APIContractMacrosTests",
             dependencies: [
                 "APIContractMacros",
