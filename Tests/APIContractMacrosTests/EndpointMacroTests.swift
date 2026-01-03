@@ -285,9 +285,14 @@ final class EndpointMacroTests: XCTestCase {
                 public static let auth: AuthRequirement = .required
 
                 public static let endpoints: [EndpointDescriptor] = []
+
+                @discardableResult
+                    public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == UsersAPI, R.Service: UsersAPIService {
+                        return routes
+                    }
             }
 
-            public protocol UsersAPIHandler: APIGroupHandler where Group == UsersAPI {
+            public protocol UsersAPIService: APIService where Group == UsersAPI {
             }
 
             extension UsersAPI: APIContractGroup {
@@ -316,9 +321,14 @@ final class EndpointMacroTests: XCTestCase {
                 public static let auth: AuthRequirement = .optional
 
                 public static let endpoints: [EndpointDescriptor] = []
+
+                @discardableResult
+                    public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == PublicAPI, R.Service: PublicAPIService {
+                        return routes
+                    }
             }
 
-            public protocol PublicAPIHandler: APIGroupHandler where Group == PublicAPI {
+            public protocol PublicAPIService: APIService where Group == PublicAPI {
             }
 
             extension PublicAPI: APIContractGroup {
