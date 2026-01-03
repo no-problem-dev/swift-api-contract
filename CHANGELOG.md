@@ -9,6 +9,22 @@
 
 なし
 
+## [1.0.5] - 2026-01-03
+
+### 変更
+
+- **APIExecutor → APIExecutable リネーム**: ~able命名規則に統一
+  - `APIExecutor` プロトコルを `APIExecutable` に変更
+
+### 改善
+
+- **コードクリーンアップ**: 不要なMARKコメントと冗長なドキュメントを削除
+  - publicプロトコルには簡潔なドキュメントコメントを保持
+
+### 修正
+
+- **テスト修正**: テストの期待値をマクロ出力に合わせて更新
+
 ## [1.0.4] - 2026-01-02
 
 ### 変更
@@ -119,7 +135,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.4...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...v1.0.2
@@ -133,3 +150,5 @@
 <!-- Auto-generated on 2026-01-01T05:49:57Z by release workflow -->
 
 <!-- Auto-generated on 2026-01-01T12:25:13Z by release workflow -->
+
+<!-- Auto-generated on 2026-01-02T07:35:29Z by release workflow -->
