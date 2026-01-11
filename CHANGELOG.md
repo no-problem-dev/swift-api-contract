@@ -9,6 +9,26 @@
 
 なし
 
+## [1.0.7] - 2026-01-11
+
+### 追加
+
+- **@StreamingEndpoint マクロ**: SSEストリーミングAPI定義のサポート
+  - `StreamingAPIContract` プロトコル: `Event` 関連型を持つストリーミングレスポンス用
+  - `StreamingAPIExecutable` プロトコル: クライアント側ストリーミング実行
+  - `StreamingRouteRegistrar` プロトコル: サーバー側ルート登録
+  - `@StreamingEndpoint` マクロ: `@Endpoint` の並列版でストリーミングAPI定義
+
+### 使用例
+
+```swift
+@StreamingEndpoint(.post, path: "stream")
+public struct StartStream {
+    @Body public var request: SearchRequest
+    public typealias Event = SearchEvent  // クライアントにストリームされるイベント型
+}
+```
+
 ## [1.0.6] - 2026-01-03
 
 ### 修正
@@ -154,7 +174,8 @@
 
 - マクロ展開テスト（EndpointMacroTests）
 
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.6...HEAD
+[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.3...v1.0.4
