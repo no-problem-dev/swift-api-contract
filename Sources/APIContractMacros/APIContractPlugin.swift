@@ -6,6 +6,7 @@ struct APIContractPlugin: CompilerPlugin {
     let providingMacros: [Macro.Type] = [
         APIGroupMacro.self,
         EndpointMacro.self,
+        StreamingEndpointMacro.self,
         PathParamMacro.self,
         QueryParamMacro.self,
         BodyMacro.self,
