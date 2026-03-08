@@ -10,6 +10,7 @@ struct APIContractPlugin: CompilerPlugin {
         PathParamMacro.self,
         QueryParamMacro.self,
         BodyMacro.self,
+        HeaderMacro.self,
         APIServicesMacro.self,
     ]
 }

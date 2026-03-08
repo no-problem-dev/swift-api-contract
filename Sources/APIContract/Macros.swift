@@ -1,10 +1,11 @@
 /// APIグループを定義するマクロ
-@attached(member, names: named(basePath), named(auth), named(endpoints), named(registerAll))
+@attached(member, names: named(basePath), named(auth), named(commonHeaders), named(endpoints), named(registerAll))
 @attached(extension, conformances: APIContractGroup)
 @attached(peer, names: suffixed(Service))
 public macro APIGroup(
     path: String,
-    auth: AuthRequirement = .required
+    auth: AuthScheme = .bearer,
+    headers: [String: String] = [:]
 ) = #externalMacro(module: "APIContractMacros", type: "APIGroupMacro")
 
 /// エンドポイントを定義するマクロ
@@ -16,6 +17,7 @@ public macro APIGroup(
     named(subPath),
     named(pathParameters),
     named(queryParameters),
+    named(additionalHeaders),
     named(encodeBody),
     named(init),
     named(decode)
@@ -39,23 +41,30 @@ public macro QueryParam(
 @attached(peer)
 public macro Body() = #externalMacro(module: "APIContractMacros", type: "BodyMacro")
 
+/// HTTPヘッダーをマークするマクロ
+///
+/// エンドポイントの特定リクエストに動的に付与するHTTPヘッダーを定義する。
+/// Optional型の場合、nil のときはヘッダーに含まれない。
+///
+/// ## 使用例
+/// ```swift
+/// @Endpoint(.post)
+/// struct CreateMessage {
+///     @Header("anthropic-beta") var beta: String?
+///     @Body var request: MessageRequest
+///     typealias Output = MessageResponse
+/// }
+/// ```
+@attached(peer)
+public macro Header(
+    _ name: String? = nil
+) = #externalMacro(module: "APIContractMacros", type: "HeaderMacro")
+
 /// 複数のAPIサービスをグループ化するマクロ
 @attached(member, names: named(registerAll))
 public macro APIServices() = #externalMacro(module: "APIContractMacros", type: "APIServicesMacro")
 
 /// ストリーミングエンドポイントを定義するマクロ
-///
-/// 通常の`@Endpoint`がリクエスト-レスポンス型なのに対し、
-/// `@StreamingEndpoint`はストリーミングレスポンスを返すエンドポイントを定義します。
-///
-/// ## 使用例
-/// ```swift
-/// @StreamingEndpoint(.post, path: "stream")
-/// public struct StartStream {
-///     @Body public var request: SearchRequest
-///     public typealias Event = SearchEvent  // ストリームで送信されるイベント型
-/// }
-/// ```
 @attached(extension, conformances: StreamingAPIContract, APIInput)
 @attached(member, names:
     named(Input),
@@ -64,6 +73,7 @@ public macro APIServices() = #externalMacro(module: "APIContractMacros", type: "
     named(subPath),
     named(pathParameters),
     named(queryParameters),
+    named(additionalHeaders),
     named(encodeBody),
     named(init),
     named(decode)

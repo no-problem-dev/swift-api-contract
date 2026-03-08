@@ -16,37 +16,26 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // structにのみ適用可能
         guard let structDecl = declaration.as(StructDeclSyntax.self) else {
             throw StreamingEndpointMacroError.onlyApplicableToStruct
         }
 
-        // マクロ引数を解析
         let arguments = try parseArguments(from: node)
-
-        // プロパティ情報を収集
         let properties = try collectProperties(from: structDecl)
-
-        // 親enumを検出してGroupとして使用
         let parentEnumName = findParentEnumName(in: context)
 
         var members: [DeclSyntax] = []
 
-        // typealias Input = Self
         members.append("public typealias Input = Self")
 
-        // typealias Group = ParentEnumName (親enumが見つかった場合のみ)
         if let groupName = parentEnumName {
             members.append("public typealias Group = \(raw: groupName)")
         }
 
-        // static let method: APIMethod
         members.append("public static let method: APIMethod = .\(raw: arguments.method)")
-
-        // static let subPath: String
         members.append("public static let subPath: String = \"\(raw: arguments.path)\"")
 
-        // var pathParameters: [String: String]
+        // pathParameters
         let pathParamProperties = properties.filter { $0.kind == .pathParam }
         if pathParamProperties.isEmpty {
             members.append("public var pathParameters: [String: String] { [:] }")
@@ -57,19 +46,24 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
             members.append("public var pathParameters: [String: String] { [\(raw: pathParamEntries)] }")
         }
 
-        // var queryParameters: [String: String]?
+        // queryParameters
         let queryParamProperties = properties.filter { $0.kind == .queryParam }
         members.append(generateQueryParametersProperty(for: queryParamProperties))
 
-        // func encodeBody(using encoder: JSONEncoder) throws -> Data?
+        // additionalHeaders
+        let headerProperties = properties.filter { $0.kind == .header }
+        members.append(generateAdditionalHeadersProperty(for: headerProperties))
+
+        // encodeBody
         let bodyProperty = properties.first { $0.kind == .body }
         members.append(generateEncodeBodyMethod(for: bodyProperty))
 
         // init
         members.append(generateInitializer(for: properties))
 
-        // static func decode(...) - サーバーサイドデコーディング
-        members.append(generateDecodeMethod(for: properties))
+        // decode (excludes header properties)
+        let nonHeaderProperties = properties.filter { $0.kind != .header }
+        members.append(generateDecodeMethod(for: nonHeaderProperties))
 
         return members
     }
@@ -83,12 +77,10 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-        // structでない場合は空の配列を返す（エラーはMemberMacroで報告済み）
         guard declaration.is(StructDeclSyntax.self) else {
             return []
         }
 
-        // StreamingAPIContract と APIInput への準拠
         let extensionDecl: DeclSyntax = """
         extension \(type.trimmed): StreamingAPIContract, APIInput {}
         """
@@ -102,10 +94,8 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
 
     // MARK: - Private Helpers
 
-    /// レキシカルコンテキストから親enumの名前を検出
     private static func findParentEnumName(in context: some MacroExpansionContext) -> String? {
         for lexicalContext in context.lexicalContext {
-            // enumを探す
             if let enumDecl = lexicalContext.as(EnumDeclSyntax.self) {
                 return enumDecl.name.text
             }
@@ -123,7 +113,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
 
         for argument in arguments {
             if argument.label == nil {
-                // 最初の引数（method）
                 if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self) {
                     method = memberAccess.declName.baseName.text
                 }
@@ -149,7 +138,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
                 continue
             }
 
-            // typealias Event, Input は除外
             if pattern.identifier.text == "Event" || pattern.identifier.text == "Input" {
                 continue
             }
@@ -159,6 +147,7 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
             let isOptional = typeAnnotation.type.is(OptionalTypeSyntax.self)
             let kind = determinePropertyKind(from: varDecl)
             let queryName = extractQueryParamName(from: varDecl) ?? name
+            let headerName = extractHeaderName(from: varDecl) ?? name
             let defaultValue = binding.initializer?.value.trimmedDescription
 
             properties.append(PropertyInfo(
@@ -167,6 +156,7 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
                 isOptional: isOptional,
                 kind: kind,
                 queryName: queryName,
+                headerName: headerName,
                 defaultValue: defaultValue
             ))
         }
@@ -188,12 +178,13 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
                 return .queryParam
             case "Body":
                 return .body
+            case "Header":
+                return .header
             default:
                 continue
             }
         }
 
-        // デフォルトはクエリパラメータ
         return .queryParam
     }
 
@@ -209,6 +200,26 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
             for argument in arguments {
                 if argument.label?.text == "name",
                    let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
+                   let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self) {
+                    return segment.content.text
+                }
+            }
+        }
+
+        return nil
+    }
+
+    private static func extractHeaderName(from varDecl: VariableDeclSyntax) -> String? {
+        for attribute in varDecl.attributes {
+            guard let attr = attribute.as(AttributeSyntax.self),
+                  let identifier = attr.attributeName.as(IdentifierTypeSyntax.self),
+                  identifier.name.text == "Header",
+                  let arguments = attr.arguments?.as(LabeledExprListSyntax.self) else {
+                continue
+            }
+
+            for argument in arguments {
+                if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
                    let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self) {
                     return segment.content.text
                 }
@@ -244,6 +255,32 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
     }
 
+    private static func generateAdditionalHeadersProperty(for properties: [PropertyInfo]) -> DeclSyntax {
+        if properties.isEmpty {
+            return "public var additionalHeaders: [String: String] { [:] }"
+        }
+
+        var lines: [String] = []
+        lines.append("public var additionalHeaders: [String: String] {")
+        lines.append("    var headers: [String: String] = [:]")
+
+        for prop in properties {
+            let headerName = prop.headerName
+            if prop.isOptional {
+                lines.append("    if let \(prop.name) {")
+                lines.append("        headers[\"\(headerName)\"] = \(generateStringConversion(for: prop))")
+                lines.append("    }")
+            } else {
+                lines.append("    headers[\"\(headerName)\"] = \(generateStringConversion(for: prop))")
+            }
+        }
+
+        lines.append("    return headers")
+        lines.append("}")
+
+        return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
+    }
+
     private static func generateStringConversion(for prop: PropertyInfo) -> String {
         let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
 
@@ -257,7 +294,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         case "Date":
             return "Self.encodeDate(\(prop.name))"
         default:
-            // RawRepresentable (enum) と仮定
             return "\(prop.name).rawValue"
         }
     }
@@ -305,7 +341,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         """)
     }
 
-    /// サーバーサイドデコーディング用のdecodeメソッドを生成
     private static func generateDecodeMethod(for properties: [PropertyInfo]) -> DeclSyntax {
         if properties.isEmpty {
             return """
@@ -328,7 +363,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         lines.append("    decoder: JSONDecoder")
         lines.append(") throws -> Self {")
 
-        // 各プロパティをデコード
         for prop in properties {
             switch prop.kind {
             case .pathParam:
@@ -337,10 +371,11 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
                 lines.append(generateQueryParamDecoding(for: prop))
             case .body:
                 lines.append(generateBodyDecoding(for: prop))
+            case .header:
+                break
             }
         }
 
-        // イニシャライザを呼び出し
         let initArgs = properties.map { "\($0.name): \($0.name)" }.joined(separator: ", ")
         lines.append("    return Self(\(initArgs))")
         lines.append("}")
@@ -348,7 +383,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
     }
 
-    /// パスパラメータのデコーディングコードを生成
     private static func generatePathParamDecoding(for prop: PropertyInfo) -> String {
         let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
 
@@ -376,7 +410,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    /// クエリパラメータのデコーディングコードを生成
     private static func generateQueryParamDecoding(for prop: PropertyInfo) -> String {
         let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
 
@@ -410,7 +443,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    /// ボディのデコーディングコードを生成
     private static func generateBodyDecoding(for prop: PropertyInfo) -> String {
         if prop.isOptional {
             return """
@@ -431,7 +463,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    /// 文字列から型への変換コードを生成
     private static func generateValueConversion(from source: String, to typeName: String) -> String {
         switch typeName {
         case "String":
@@ -451,7 +482,6 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         case "Date":
             return "ISO8601DateFormatter().date(from: \(source))"
         default:
-            // RawRepresentable (enum) と仮定
             return "\(typeName)(rawValue: \(source))"
         }
     }

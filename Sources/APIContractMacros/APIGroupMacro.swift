@@ -2,10 +2,6 @@ import SwiftSyntax
 import SwiftSyntaxMacros
 
 /// APIグループを定義するマクロ
-///
-/// enumに付与して、関連するエンドポイントをグループ化します。
-/// `APIContractGroup`プロトコルへの準拠と、`basePath`・`auth`・`endpoints`プロパティを自動生成します。
-/// また、対応するServiceプロトコルを自動生成します。
 public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
 
     // MARK: - MemberMacro
@@ -16,15 +12,11 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // enumにのみ適用可能
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             throw APIGroupMacroError.onlyApplicableToEnum
         }
 
-        // マクロ引数を解析
         let arguments = try parseArguments(from: node)
-
-        // @Endpoint付きstructを収集
         let endpointInfos = collectEndpoints(from: enumDecl)
 
         var members: [DeclSyntax] = []
@@ -32,13 +24,23 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         // static let basePath: String
         members.append("public static let basePath: String = \"\(raw: arguments.path)\"")
 
-        // static let auth: AuthRequirement
-        members.append("public static let auth: AuthRequirement = .\(raw: arguments.auth)")
+        // static let auth: AuthScheme
+        members.append("public static let auth: AuthScheme = \(raw: arguments.authExpression)")
+
+        // static let commonHeaders: [String: String]
+        if arguments.headers.isEmpty {
+            members.append("public static let commonHeaders: [String: String] = [:]")
+        } else {
+            let headerEntries = arguments.headers.map { key, value in
+                "\"\(key)\": \"\(value)\""
+            }.joined(separator: ", ")
+            members.append(DeclSyntax(stringLiteral: "public static let commonHeaders: [String: String] = [\(headerEntries)]"))
+        }
 
         // static let endpoints: [EndpointDescriptor]
         members.append(generateEndpointsProperty(for: endpointInfos))
 
-        // static func registerAll - 全エンドポイントを一括登録
+        // static func registerAll
         let enumName = enumDecl.name.text
         members.append(generateRegisterAllMethod(enumName: enumName, endpoints: endpointInfos))
 
@@ -54,12 +56,10 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-        // enumでない場合は空の配列を返す（エラーはMemberMacroで報告済み）
         guard declaration.is(EnumDeclSyntax.self) else {
             return []
         }
 
-        // APIContractGroup準拠の extension
         let conformanceDecl: DeclSyntax = """
         extension \(type.trimmed): APIContractGroup {}
         """
@@ -78,17 +78,13 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         providingPeersOf declaration: some DeclSyntaxProtocol,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // enumにのみ適用可能
         guard let enumDecl = declaration.as(EnumDeclSyntax.self) else {
             return []
         }
 
         let enumName = enumDecl.name.text
-
-        // @Endpoint付きstructを収集
         let endpointInfos = collectEndpoints(from: enumDecl)
 
-        // Serviceプロトコルを生成（PeerMacroで生成可能）
         return [generateServiceProtocol(enumName: enumName, endpoints: endpointInfos)]
     }
 
@@ -100,7 +96,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         }
 
         var path: String = ""
-        var auth: String = "required"
+        var authExpression: String = ".bearer"
+        var headers: [(String, String)] = []
 
         for argument in arguments {
             switch argument.label?.text {
@@ -110,15 +107,38 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                     path = segment.content.text
                 }
             case "auth":
-                if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self) {
-                    auth = memberAccess.declName.baseName.text
-                }
+                // AuthScheme の式をそのまま文字列として保持
+                authExpression = argument.expression.trimmedDescription
+            case "headers":
+                headers = parseDictionaryLiteral(from: argument.expression)
             default:
                 continue
             }
         }
 
-        return APIGroupArguments(path: path, auth: auth)
+        return APIGroupArguments(path: path, authExpression: authExpression, headers: headers)
+    }
+
+    /// [String: String] リテラルをパース
+    private static func parseDictionaryLiteral(from expr: ExprSyntax) -> [(String, String)] {
+        guard let dictExpr = expr.as(DictionaryExprSyntax.self) else {
+            return []
+        }
+
+        guard case .elements(let elements) = dictExpr.content else {
+            return []
+        }
+
+        var result: [(String, String)] = []
+        for element in elements {
+            if let keyLiteral = element.key.as(StringLiteralExprSyntax.self),
+               let keySegment = keyLiteral.segments.first?.as(StringSegmentSyntax.self),
+               let valueLiteral = element.value.as(StringLiteralExprSyntax.self),
+               let valueSegment = valueLiteral.segments.first?.as(StringSegmentSyntax.self) {
+                result.append((keySegment.content.text, valueSegment.content.text))
+            }
+        }
+        return result
     }
 
     /// enum内の@Endpoint付きstructを収集
@@ -130,7 +150,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                 continue
             }
 
-            // @Endpoint属性を探す
             for attribute in structDecl.attributes {
                 guard let attr = attribute.as(AttributeSyntax.self),
                       let identifier = attr.attributeName.as(IdentifierTypeSyntax.self),
@@ -138,11 +157,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                     continue
                 }
 
-                // @Endpoint引数を解析
                 let (method, path) = parseEndpointArguments(from: attr)
                 let name = structDecl.name.text
-
-                // Output型を取得
                 let outputType = findOutputType(from: structDecl)
 
                 endpoints.append(EndpointInfo(
@@ -158,7 +174,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         return endpoints
     }
 
-    /// @Endpoint属性からmethodとpathを抽出
     private static func parseEndpointArguments(from attr: AttributeSyntax) -> (method: String, path: String) {
         var method = "get"
         var path = ""
@@ -169,7 +184,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
 
         for argument in arguments {
             if argument.label == nil {
-                // 最初の引数（method）
                 if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self) {
                     method = memberAccess.declName.baseName.text
                 }
@@ -184,7 +198,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         return (method, path)
     }
 
-    /// struct内のOutput typealiasを探す
     private static func findOutputType(from structDecl: StructDeclSyntax) -> String {
         for member in structDecl.memberBlock.members {
             guard let typealiasDecl = member.decl.as(TypeAliasDeclSyntax.self),
@@ -196,7 +209,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         return "Void"
     }
 
-    /// endpoints静的プロパティを生成
     private static func generateEndpointsProperty(for endpoints: [EndpointInfo]) -> DeclSyntax {
         if endpoints.isEmpty {
             return "public static let endpoints: [EndpointDescriptor] = []"
@@ -215,7 +227,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         """)
     }
 
-    /// Serviceプロトコルを生成
     private static func generateServiceProtocol(enumName: String, endpoints: [EndpointInfo]) -> DeclSyntax {
         let serviceProtocolName = "\(enumName)Service"
 
@@ -240,7 +251,6 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         """)
     }
 
-    /// registerAll static メソッドを生成
     private static func generateRegisterAllMethod(enumName: String, endpoints: [EndpointInfo]) -> DeclSyntax {
         let serviceProtocolName = "\(enumName)Service"
 
@@ -253,10 +263,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
             """)
         }
 
-        // 各エンドポイントの登録コードを生成
         let registrations = endpoints.enumerated().map { (index, endpoint) in
-            let isFirst = index == 0
-            let prefix = isFirst ? "routes" : ""
+            let prefix = index == 0 ? "routes" : ""
             return """
             \(prefix).register(\(enumName).\(endpoint.name).self) { input, ctx in
                         try await routes.service.handle(input, context: ctx)
@@ -278,7 +286,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
 
 private struct APIGroupArguments {
     let path: String
-    let auth: String
+    let authExpression: String
+    let headers: [(String, String)]
 }
 
 private struct EndpointInfo {

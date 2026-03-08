@@ -6,12 +6,14 @@ import XCTest
 #if canImport(APIContractMacros)
 import APIContractMacros
 
-nonisolated(unsafe) let testMacros: [String: Macro.Type] = [
+let testMacros: [String: Macro.Type] = [
     "APIGroup": APIGroupMacro.self,
     "Endpoint": EndpointMacro.self,
+    "StreamingEndpoint": StreamingEndpointMacro.self,
     "PathParam": PathParamMacro.self,
     "QueryParam": QueryParamMacro.self,
     "Body": BodyMacro.self,
+    "Header": HeaderMacro.self,
 ]
 #endif
 
@@ -44,6 +46,10 @@ final class EndpointMacroTests: XCTestCase {
 
                 public var queryParameters: [String: String]? {
                     nil
+                }
+
+                public var additionalHeaders: [String: String] {
+                    [:]
                 }
 
                 public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
@@ -100,6 +106,10 @@ final class EndpointMacroTests: XCTestCase {
 
                 public var queryParameters: [String: String]? {
                     nil
+                }
+
+                public var additionalHeaders: [String: String] {
+                    [:]
                 }
 
                 public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
@@ -171,6 +181,10 @@ final class EndpointMacroTests: XCTestCase {
                     return params.isEmpty ? nil : params
                 }
 
+                public var additionalHeaders: [String: String] {
+                    [:]
+                }
+
                 public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
                     nil
                 }
@@ -235,6 +249,10 @@ final class EndpointMacroTests: XCTestCase {
                     nil
                 }
 
+                public var additionalHeaders: [String: String] {
+                    [:]
+                }
+
                 public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
                     try encoder.encode(input)
                 }
@@ -267,13 +285,87 @@ final class EndpointMacroTests: XCTestCase {
         #endif
     }
 
+    // MARK: - Header Tests
+
+    func testEndpointWithHeader() throws {
+        #if canImport(APIContractMacros)
+        assertMacroExpansion(
+            """
+            @Endpoint(.post)
+            struct CreateMessage {
+                @Header("anthropic-beta") var beta: String?
+                @Body var request: MessageRequest
+                typealias Output = MessageResponse
+            }
+            """,
+            expandedSource: """
+            struct CreateMessage {
+                var beta: String?
+                var request: MessageRequest
+                typealias Output = MessageResponse
+
+                public typealias Input = Self
+
+                public static let method: APIMethod = .post
+
+                public static let subPath: String = ""
+
+                public var pathParameters: [String: String] {
+                    [:]
+                }
+
+                public var queryParameters: [String: String]? {
+                    nil
+                }
+
+                public var additionalHeaders: [String: String] {
+                    var headers: [String: String] = [:]
+                    if let beta {
+                        headers["anthropic-beta"] = beta
+                    }
+                    return headers
+                }
+
+                public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                    try encoder.encode(request)
+                }
+
+                public init(beta: String? = nil, request: MessageRequest) {
+                    self.beta = beta
+                    self.request = request
+                }
+
+                public static func decode(
+                    pathParameters: [String: String],
+                    queryParameters: [String: String],
+                    body: Data?,
+                    decoder: JSONDecoder
+                ) throws -> Self {
+                    guard let bodyData = body else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing request body"))
+                    }
+                    let request = try decoder.decode(MessageRequest.self, from: bodyData)
+                    return Self(request: request)
+                }
+            }
+
+            extension CreateMessage: APIContract, APIInput {
+            }
+            """,
+            macros: testMacros
+        )
+        #else
+        throw XCTSkip("macros are only supported when running tests for the host platform")
+        #endif
+    }
+
     // MARK: - APIGroup Tests
 
     func testAPIGroup() throws {
         #if canImport(APIContractMacros)
         assertMacroExpansion(
             """
-            @APIGroup(path: "/v1/users", auth: .required)
+            @APIGroup(path: "/v1/users", auth: .bearer)
             enum UsersAPI {
             }
             """,
@@ -282,7 +374,9 @@ final class EndpointMacroTests: XCTestCase {
 
                 public static let basePath: String = "/v1/users"
 
-                public static let auth: AuthRequirement = .required
+                public static let auth: AuthScheme = .bearer
+
+                public static let commonHeaders: [String: String] = [:]
 
                 public static let endpoints: [EndpointDescriptor] = []
 
@@ -305,33 +399,35 @@ final class EndpointMacroTests: XCTestCase {
         #endif
     }
 
-    func testAPIGroupWithOptionalAuth() throws {
+    func testAPIGroupWithAPIKeyAuth() throws {
         #if canImport(APIContractMacros)
         assertMacroExpansion(
             """
-            @APIGroup(path: "/v1/public", auth: .optional)
-            enum PublicAPI {
+            @APIGroup(path: "/v1/messages", auth: .apiKey(headerName: "x-api-key"), headers: ["anthropic-version": "2023-06-01"])
+            enum AnthropicAPI {
             }
             """,
             expandedSource: """
-            enum PublicAPI {
+            enum AnthropicAPI {
 
-                public static let basePath: String = "/v1/public"
+                public static let basePath: String = "/v1/messages"
 
-                public static let auth: AuthRequirement = .optional
+                public static let auth: AuthScheme = .apiKey(headerName: "x-api-key")
+
+                public static let commonHeaders: [String: String] = ["anthropic-version": "2023-06-01"]
 
                 public static let endpoints: [EndpointDescriptor] = []
 
                 @discardableResult
-                    public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == PublicAPI, R.Service: PublicAPIService {
+                    public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == AnthropicAPI, R.Service: AnthropicAPIService {
                         return routes
                     }
             }
 
-            public protocol PublicAPIService: APIService where Group == PublicAPI {
+            public protocol AnthropicAPIService: APIService where Group == AnthropicAPI {
             }
 
-            extension PublicAPI: APIContractGroup {
+            extension AnthropicAPI: APIContractGroup {
             }
             """,
             macros: testMacros
@@ -345,8 +441,6 @@ final class EndpointMacroTests: XCTestCase {
 
     func testEndpointInsideAPIGroup() throws {
         #if canImport(APIContractMacros)
-        // When an @Endpoint is inside an enum with @APIGroup,
-        // it should detect the parent enum and generate typealias Group
         assertMacroExpansion(
             """
             enum UsersAPI {
@@ -377,6 +471,10 @@ final class EndpointMacroTests: XCTestCase {
 
                     public var queryParameters: [String: String]? {
                         nil
+                    }
+
+                    public var additionalHeaders: [String: String] {
+                        [:]
                     }
 
                     public func encodeBody(using encoder: JSONEncoder) throws -> Data? {

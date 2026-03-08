@@ -60,15 +60,20 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         let queryParamProperties = properties.filter { $0.kind == .queryParam }
         members.append(generateQueryParametersProperty(for: queryParamProperties))
 
+        // var additionalHeaders: [String: String]
+        let headerProperties = properties.filter { $0.kind == .header }
+        members.append(generateAdditionalHeadersProperty(for: headerProperties))
+
         // func encodeBody(using encoder: JSONEncoder) throws -> Data?
         let bodyProperty = properties.first { $0.kind == .body }
         members.append(generateEncodeBodyMethod(for: bodyProperty))
 
-        // init
+        // init (ヘッダープロパティを除いた入力パラメータのみ含める)
         members.append(generateInitializer(for: properties))
 
         // static func decode(...) - サーバーサイドデコーディング
-        members.append(generateDecodeMethod(for: properties))
+        let nonHeaderProperties = properties.filter { $0.kind != .header }
+        members.append(generateDecodeMethod(for: nonHeaderProperties))
 
         return members
     }
@@ -157,6 +162,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             let isOptional = typeAnnotation.type.is(OptionalTypeSyntax.self)
             let kind = determinePropertyKind(from: varDecl)
             let queryName = extractQueryParamName(from: varDecl) ?? name
+            let headerName = extractHeaderName(from: varDecl) ?? name
             let defaultValue = binding.initializer?.value.trimmedDescription
 
             properties.append(PropertyInfo(
@@ -165,6 +171,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
                 isOptional: isOptional,
                 kind: kind,
                 queryName: queryName,
+                headerName: headerName,
                 defaultValue: defaultValue
             ))
         }
@@ -186,6 +193,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
                 return .queryParam
             case "Body":
                 return .body
+            case "Header":
+                return .header
             default:
                 continue
             }
@@ -216,6 +225,28 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         return nil
     }
 
+    /// @Header("custom-name") からヘッダー名を抽出
+    private static func extractHeaderName(from varDecl: VariableDeclSyntax) -> String? {
+        for attribute in varDecl.attributes {
+            guard let attr = attribute.as(AttributeSyntax.self),
+                  let identifier = attr.attributeName.as(IdentifierTypeSyntax.self),
+                  identifier.name.text == "Header",
+                  let arguments = attr.arguments?.as(LabeledExprListSyntax.self) else {
+                continue
+            }
+
+            for argument in arguments {
+                // 最初の無名引数、または name: ラベル付き引数
+                if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
+                   let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self) {
+                    return segment.content.text
+                }
+            }
+        }
+
+        return nil
+    }
+
     private static func generateQueryParametersProperty(for properties: [PropertyInfo]) -> DeclSyntax {
         if properties.isEmpty {
             return "public var queryParameters: [String: String]? { nil }"
@@ -237,6 +268,33 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         }
 
         lines.append("    return params.isEmpty ? nil : params")
+        lines.append("}")
+
+        return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
+    }
+
+    /// additionalHeaders プロパティを生成
+    private static func generateAdditionalHeadersProperty(for properties: [PropertyInfo]) -> DeclSyntax {
+        if properties.isEmpty {
+            return "public var additionalHeaders: [String: String] { [:] }"
+        }
+
+        var lines: [String] = []
+        lines.append("public var additionalHeaders: [String: String] {")
+        lines.append("    var headers: [String: String] = [:]")
+
+        for prop in properties {
+            let headerName = prop.headerName
+            if prop.isOptional {
+                lines.append("    if let \(prop.name) {")
+                lines.append("        headers[\"\(headerName)\"] = \(generateStringConversion(for: prop))")
+                lines.append("    }")
+            } else {
+                lines.append("    headers[\"\(headerName)\"] = \(generateStringConversion(for: prop))")
+            }
+        }
+
+        lines.append("    return headers")
         lines.append("}")
 
         return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
@@ -335,6 +393,9 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
                 lines.append(generateQueryParamDecoding(for: prop))
             case .body:
                 lines.append(generateBodyDecoding(for: prop))
+            case .header:
+                // ヘッダーはサーバーサイドデコードには含まない
+                break
             }
         }
 
@@ -394,14 +455,12 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             }
         } else {
             if baseType == "String" {
-                // String型の場合は変換不要
                 return """
                     guard let \(prop.name) = queryParameters["\(prop.queryName)"] else {
                         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing query parameter: \(prop.queryName)"))
                     }
                 """
             } else {
-                // 他の型は変換が必要
                 return """
                     guard let \(prop.name)String = queryParameters["\(prop.queryName)"],
                           let \(prop.name) = \(generateValueConversion(from: "\(prop.name)String", to: baseType)) else {
@@ -472,6 +531,7 @@ struct PropertyInfo {
     let isOptional: Bool
     let kind: PropertyKind
     let queryName: String
+    let headerName: String
     let defaultValue: String?
 }
 
@@ -479,6 +539,7 @@ enum PropertyKind {
     case pathParam
     case queryParam
     case body
+    case header
 }
 
 // MARK: - Errors

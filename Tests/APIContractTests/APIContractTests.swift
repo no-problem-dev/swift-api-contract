@@ -6,19 +6,25 @@ import Foundation
 
 enum TestGroup: APIContractGroup {
     static let basePath: String = "/v1"
-    static let auth: AuthRequirement = .required
+    static let auth: AuthScheme = .bearer
     static let endpoints: [EndpointDescriptor] = []
 }
 
 enum EmptyGroup: APIContractGroup {
     static let basePath: String = ""
-    static let auth: AuthRequirement = .none
+    static let auth: AuthScheme = .none
+    static let endpoints: [EndpointDescriptor] = []
+}
+
+enum APIKeyGroup: APIContractGroup {
+    static let basePath: String = "/v1/messages"
+    static let auth: AuthScheme = .apiKey(headerName: "x-api-key")
+    static let commonHeaders: [String: String] = ["anthropic-version": "2023-06-01"]
     static let endpoints: [EndpointDescriptor] = []
 }
 
 // MARK: - Test Contracts
 
-/// 標準的なエンドポイント（デフォルトのresolvePath使用）
 struct GetUsersContract: APIContract, APIInput {
     typealias Group = TestGroup
     typealias Input = Self
@@ -42,7 +48,6 @@ struct GetUsersContract: APIContract, APIInput {
     }
 }
 
-/// パスパラメータ付きエンドポイント
 struct GetUserContract: APIContract, APIInput {
     typealias Group = TestGroup
     typealias Input = Self
@@ -68,7 +73,6 @@ struct GetUserContract: APIContract, APIInput {
     }
 }
 
-/// カスタムresolvePath実装を持つエンドポイント
 struct CustomPathContract: APIContract, APIInput {
     typealias Group = NoGroup
     typealias Input = Self
@@ -84,7 +88,6 @@ struct CustomPathContract: APIContract, APIInput {
 
     func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
 
-    /// カスタムパス解決（プロトコル要件をオーバーライド）
     static func resolvePath(with input: Self) -> String {
         input.customPath
     }
@@ -99,7 +102,6 @@ struct CustomPathContract: APIContract, APIInput {
     }
 }
 
-/// グループなしでsubPath付きエンドポイント
 struct NoGroupContract: APIContract, APIInput {
     typealias Group = NoGroup
     typealias Input = Self
@@ -120,6 +122,39 @@ struct NoGroupContract: APIContract, APIInput {
         decoder: JSONDecoder
     ) throws -> Self {
         Self()
+    }
+}
+
+/// ヘッダー付きエンドポイント
+struct HeaderContract: APIContract, APIInput {
+    typealias Group = APIKeyGroup
+    typealias Input = Self
+    typealias Output = EmptyOutput
+
+    static let method: APIMethod = .post
+    static let subPath: String = ""
+
+    let betaHeader: String?
+
+    var pathParameters: [String: String] { [:] }
+    var queryParameters: [String: String]? { nil }
+    var additionalHeaders: [String: String] {
+        var headers: [String: String] = [:]
+        if let betaHeader {
+            headers["anthropic-beta"] = betaHeader
+        }
+        return headers
+    }
+
+    func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+
+    static func decode(
+        pathParameters: [String: String],
+        queryParameters: [String: String],
+        body: Data?,
+        decoder: JSONDecoder
+    ) throws -> Self {
+        Self(betaHeader: nil)
     }
 }
 
@@ -156,7 +191,6 @@ final class APIContractTests: XCTestCase {
     }
 
     func testResolvePathWithMultiplePathParameters() {
-        // テスト用にインラインで定義
         struct MultiParamContract: APIContract, APIInput {
             typealias Group = TestGroup
             typealias Input = Self
@@ -202,7 +236,6 @@ final class APIContractTests: XCTestCase {
     }
 
     func testCustomResolvePathGenericCall() {
-        // ジェネリック経由でもカスタム実装が呼ばれることを確認
         func resolveGeneric<E: APIContract>(_ contract: E) -> String
             where E.Input == E, E: APIInput
         {
@@ -282,6 +315,33 @@ final class APIContractTests: XCTestCase {
         XCTAssertTrue(queryItems.contains { $0.name == "page" && $0.value == "1" })
     }
 
+    // MARK: - Headers Tests
+
+    func testBuildRequestWithGroupCommonHeaders() throws {
+        let baseURL = URL(string: "https://api.anthropic.com")!
+        let contract = HeaderContract(betaHeader: nil)
+        let request = try contract.buildRequest(baseURL: baseURL)
+
+        XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-version"), "2023-06-01")
+    }
+
+    func testBuildRequestWithAdditionalHeaders() throws {
+        let baseURL = URL(string: "https://api.anthropic.com")!
+        let contract = HeaderContract(betaHeader: "structured-outputs-2025-11-13")
+        let request = try contract.buildRequest(baseURL: baseURL)
+
+        XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-version"), "2023-06-01")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "anthropic-beta"), "structured-outputs-2025-11-13")
+    }
+
+    func testBuildRequestWithoutAdditionalHeaders() throws {
+        let baseURL = URL(string: "https://api.anthropic.com")!
+        let contract = HeaderContract(betaHeader: nil)
+        let request = try contract.buildRequest(baseURL: baseURL)
+
+        XCTAssertNil(request.value(forHTTPHeaderField: "anthropic-beta"))
+    }
+
     // MARK: - APIMethod Tests
 
     func testAPIMethodRawValues() {
@@ -292,11 +352,33 @@ final class APIContractTests: XCTestCase {
         XCTAssertEqual(APIMethod.delete.rawValue, "DELETE")
     }
 
-    // MARK: - AuthRequirement Tests
+    // MARK: - AuthScheme Tests
 
-    func testAuthRequirementFromGroup() {
-        XCTAssertEqual(GetUsersContract.auth, .required)
-        XCTAssertEqual(NoGroupContract.auth, .required) // NoGroup defaults to required
+    func testAuthSchemeFromGroup() {
+        XCTAssertEqual(GetUsersContract.auth, .bearer)
+        XCTAssertEqual(NoGroupContract.auth, .bearer) // NoGroup defaults to bearer
+    }
+
+    func testAuthSchemeAPIKey() {
+        XCTAssertEqual(APIKeyGroup.auth, .apiKey(headerName: "x-api-key"))
+    }
+
+    func testAuthSchemeNone() {
+        XCTAssertEqual(EmptyGroup.auth, .none)
+    }
+
+    // MARK: - APIResponse Tests
+
+    func testAPIResponseHeaderLookup() {
+        let response = APIResponse(
+            output: EmptyOutput(),
+            statusCode: 200,
+            headers: ["X-RateLimit-Remaining": "100", "Content-Type": "application/json"]
+        )
+
+        XCTAssertEqual(response.header("x-ratelimit-remaining"), "100")
+        XCTAssertEqual(response.header("X-RateLimit-Remaining"), "100")
+        XCTAssertNil(response.header("X-Missing"))
     }
 
     // MARK: - EmptyOutput Tests
@@ -354,13 +436,23 @@ final class APIContractGroupTests: XCTestCase {
 
     func testNoGroupDefaults() {
         XCTAssertEqual(NoGroup.basePath, "")
-        XCTAssertEqual(NoGroup.auth, .required)
+        XCTAssertEqual(NoGroup.auth, .bearer)
         XCTAssertTrue(NoGroup.endpoints.isEmpty)
+        XCTAssertTrue(NoGroup.commonHeaders.isEmpty)
     }
 
     func testCustomGroup() {
         XCTAssertEqual(TestGroup.basePath, "/v1")
-        XCTAssertEqual(TestGroup.auth, .required)
+        XCTAssertEqual(TestGroup.auth, .bearer)
+    }
+
+    func testGroupWithCommonHeaders() {
+        XCTAssertEqual(APIKeyGroup.commonHeaders["anthropic-version"], "2023-06-01")
+    }
+
+    func testDefaultDecodeError() {
+        let data = "{}".data(using: .utf8)!
+        XCTAssertNil(TestGroup.decodeError(statusCode: 400, data: data, headers: [:], decoder: JSONDecoder()))
     }
 }
 

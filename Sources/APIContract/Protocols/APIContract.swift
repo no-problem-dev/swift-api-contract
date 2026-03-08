@@ -12,7 +12,13 @@ public protocol APIContract: Sendable {
 
     static var method: APIMethod { get }
     static var subPath: String { get }
-    static var auth: AuthRequirement { get }
+    static var auth: AuthScheme { get }
+
+    /// エンドポイント固有のHTTPヘッダー
+    ///
+    /// リクエストごとに動的に付与するヘッダー。
+    /// 例: `anthropic-beta: structured-outputs-2025-11-13`（条件付き）
+    var additionalHeaders: [String: String] { get }
 
     /// 入力からパスを解決する
     ///
@@ -22,7 +28,9 @@ public protocol APIContract: Sendable {
 }
 
 extension APIContract {
-    public static var auth: AuthRequirement { Group.auth }
+    public static var auth: AuthScheme { Group.auth }
+
+    public var additionalHeaders: [String: String] { [:] }
 
     public static var pathTemplate: String {
         let base = Group.basePath
@@ -68,6 +76,16 @@ extension APIContract where Input == Self, Self: APIInput {
 
         if request.httpBody != nil {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+
+        // グループ共通ヘッダー適用
+        for (key, value) in Group.commonHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        // エンドポイント固有ヘッダー適用（グループヘッダーより優先）
+        for (key, value) in additionalHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
         }
 
         return request

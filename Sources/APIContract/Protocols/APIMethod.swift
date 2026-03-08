@@ -9,8 +9,21 @@ public enum APIMethod: String, Sendable, Codable, CaseIterable {
     case options = "OPTIONS"
 }
 
-/// 認証要件
-public enum AuthRequirement: Sendable, Codable {
+/// 認証方式
+///
+/// エンドポイントグループがどの認証スキームを使用するかを宣言する。
+/// トークン値の取得は `AuthTokenProvider`（APIClient側）が担当し、
+/// `AuthScheme` はトークンのHTTPリクエストへの適用方法を定義する。
+public enum AuthScheme: Sendable, Equatable {
+    /// 認証不要
     case none
-    case required
+
+    /// Bearer トークン（Authorization: Bearer <token>）
+    case bearer
+
+    /// API Key ヘッダー（例: x-api-key: <token>）
+    case apiKey(headerName: String)
+
+    /// クエリパラメータ（例: ?key=<token>）
+    case queryParam(name: String)
 }
