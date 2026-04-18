@@ -44,6 +44,7 @@ extension APIContract {
         var path = pathTemplate
         for (key, value) in input.pathParameters {
             path = path.replacingOccurrences(of: ":\(key)", with: value)
+            path = path.replacingOccurrences(of: "{\(key)}", with: value)
         }
         return path
     }

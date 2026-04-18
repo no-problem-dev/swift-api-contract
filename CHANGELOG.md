@@ -9,6 +9,15 @@
 
 なし
 
+## [1.2.0] - 2026-04-18
+
+### 追加
+
+- **`{key}` プレースホルダー構文サポート**: `resolvePath` が `:key` 形式に加えて `{key}` 形式も substitute 対象にする
+  - Go chi ルーター / OpenAPI 仕様との整合性を確保
+  - 既存の `:key` 定義は引き続き動作（後方互換）
+  - 例: `@Endpoint(.patch, path: "/social-challenges/{id}/status")` が正しく id を展開するようになる
+
 ## [1.0.7] - 2026-01-11
 
 ### 追加

@@ -227,6 +227,39 @@ final class APIContractTests: XCTestCase {
         XCTAssertEqual(path, "/v1/users/user-1/posts/post-2")
     }
 
+    func testResolvePathWithBracePlaceholder() {
+        // サーバー側 (Go chi / OpenAPI) が採用する `{key}` 形式も substitution 対象に含める。
+        // クライアント契約側が `:key` と `{key}` のどちらで書かれても同じ pathParameter を解決できる。
+        struct BraceContract: APIContract, APIInput {
+            typealias Group = TestGroup
+            typealias Input = Self
+            typealias Output = EmptyOutput
+
+            static let method: APIMethod = .patch
+            static let subPath: String = "/social-challenges/{id}/status"
+
+            let id: String
+
+            var pathParameters: [String: String] { ["id": id] }
+            var queryParameters: [String: String]? { nil }
+
+            func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+
+            static func decode(
+                pathParameters: [String: String],
+                queryParameters: [String: String],
+                body: Data?,
+                decoder: JSONDecoder
+            ) throws -> Self {
+                Self(id: pathParameters["id"] ?? "")
+            }
+        }
+
+        let contract = BraceContract(id: "abc-123")
+        let path = BraceContract.resolvePath(with: contract)
+        XCTAssertEqual(path, "/v1/social-challenges/abc-123/status")
+    }
+
     // MARK: - Custom resolvePath Tests
 
     func testCustomResolvePathDirectCall() {
