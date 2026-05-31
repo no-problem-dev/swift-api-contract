@@ -53,7 +53,7 @@ extension APIContract {
 extension APIContract where Input == Self, Self: APIInput {
     public func buildRequest(
         baseURL: URL,
-        encoder: JSONEncoder = .apiDefault
+        encoder: any APIBodyEncoder = JSONEncoder.apiDefault
     ) throws -> URLRequest {
         let path = Self.resolvePath(with: self)
         guard var urlComponents = URLComponents(

@@ -19,13 +19,13 @@ public protocol APIContractGroup: Sendable {
     /// プロバイダー固有のエラーレスポンスJSON構造をデコードする。
     /// レスポンスヘッダーも受け取るため、レート制限情報の抽出等に活用できる。
     /// `nil` を返した場合、APIClient のデフォルトエラーハンドリングが使用される。
-    static func decodeError(statusCode: Int, data: Data, headers: [String: String], decoder: JSONDecoder) -> (any Error)?
+    static func decodeError(statusCode: Int, data: Data, headers: [String: String], decoder: any APIBodyDecoder) -> (any Error)?
 }
 
 extension APIContractGroup {
     public static var commonHeaders: [String: String] { [:] }
 
-    public static func decodeError(statusCode: Int, data: Data, headers: [String: String], decoder: JSONDecoder) -> (any Error)? {
+    public static func decodeError(statusCode: Int, data: Data, headers: [String: String], decoder: any APIBodyDecoder) -> (any Error)? {
         nil
     }
 }

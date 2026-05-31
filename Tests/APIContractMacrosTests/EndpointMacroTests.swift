@@ -52,7 +52,7 @@ final class EndpointMacroTests: XCTestCase {
                     [:]
                 }
 
-                public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
                     nil
                 }
 
@@ -63,7 +63,7 @@ final class EndpointMacroTests: XCTestCase {
                     pathParameters: [String: String],
                     queryParameters: [String: String],
                     body: Data?,
-                    decoder: JSONDecoder
+                    decoder: any APIBodyDecoder
                 ) throws -> Self {
                     Self()
                 }
@@ -112,7 +112,7 @@ final class EndpointMacroTests: XCTestCase {
                     [:]
                 }
 
-                public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
                     nil
                 }
 
@@ -124,7 +124,7 @@ final class EndpointMacroTests: XCTestCase {
                     pathParameters: [String: String],
                     queryParameters: [String: String],
                     body: Data?,
-                    decoder: JSONDecoder
+                    decoder: any APIBodyDecoder
                 ) throws -> Self {
                     guard let userId = pathParameters["userId"] else {
                         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: userId"))
@@ -185,7 +185,7 @@ final class EndpointMacroTests: XCTestCase {
                     [:]
                 }
 
-                public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
                     nil
                 }
 
@@ -198,7 +198,7 @@ final class EndpointMacroTests: XCTestCase {
                     pathParameters: [String: String],
                     queryParameters: [String: String],
                     body: Data?,
-                    decoder: JSONDecoder
+                    decoder: any APIBodyDecoder
                 ) throws -> Self {
                     let limit = queryParameters["limit"].flatMap {
                         Int($0)
@@ -253,7 +253,7 @@ final class EndpointMacroTests: XCTestCase {
                     [:]
                 }
 
-                public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
                     try encoder.encode(input)
                 }
 
@@ -265,7 +265,7 @@ final class EndpointMacroTests: XCTestCase {
                     pathParameters: [String: String],
                     queryParameters: [String: String],
                     body: Data?,
-                    decoder: JSONDecoder
+                    decoder: any APIBodyDecoder
                 ) throws -> Self {
                     guard let bodyData = body else {
                         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing request body"))
@@ -326,7 +326,7 @@ final class EndpointMacroTests: XCTestCase {
                     return headers
                 }
 
-                public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
                     try encoder.encode(request)
                 }
 
@@ -339,7 +339,7 @@ final class EndpointMacroTests: XCTestCase {
                     pathParameters: [String: String],
                     queryParameters: [String: String],
                     body: Data?,
-                    decoder: JSONDecoder
+                    decoder: any APIBodyDecoder
                 ) throws -> Self {
                     guard let bodyData = body else {
                         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing request body"))
@@ -477,7 +477,7 @@ final class EndpointMacroTests: XCTestCase {
                         [:]
                     }
 
-                    public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+                    public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
                         nil
                     }
 
@@ -489,7 +489,7 @@ final class EndpointMacroTests: XCTestCase {
                         pathParameters: [String: String],
                         queryParameters: [String: String],
                         body: Data?,
-                        decoder: JSONDecoder
+                        decoder: any APIBodyDecoder
                     ) throws -> Self {
                         guard let userId = pathParameters["userId"] else {
                             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: userId"))

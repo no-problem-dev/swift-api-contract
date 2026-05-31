@@ -8,7 +8,7 @@ public struct EmptyInput: APIInput, Codable {
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self {
         Self()
     }

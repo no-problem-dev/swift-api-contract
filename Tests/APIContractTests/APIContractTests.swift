@@ -36,13 +36,13 @@ struct GetUsersContract: APIContract, APIInput {
     var pathParameters: [String: String] { [:] }
     var queryParameters: [String: String]? { nil }
 
-    func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+    func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
     static func decode(
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self {
         Self()
     }
@@ -61,13 +61,13 @@ struct GetUserContract: APIContract, APIInput {
     var pathParameters: [String: String] { ["id": userId] }
     var queryParameters: [String: String]? { nil }
 
-    func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+    func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
     static func decode(
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self {
         Self(userId: pathParameters["id"] ?? "")
     }
@@ -86,7 +86,7 @@ struct CustomPathContract: APIContract, APIInput {
     var pathParameters: [String: String] { [:] }
     var queryParameters: [String: String]? { nil }
 
-    func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+    func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
     static func resolvePath(with input: Self) -> String {
         input.customPath
@@ -96,7 +96,7 @@ struct CustomPathContract: APIContract, APIInput {
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self {
         fatalError("Client-only contract")
     }
@@ -113,13 +113,13 @@ struct NoGroupContract: APIContract, APIInput {
     var pathParameters: [String: String] { [:] }
     var queryParameters: [String: String]? { nil }
 
-    func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+    func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
     static func decode(
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self {
         Self()
     }
@@ -146,13 +146,13 @@ struct HeaderContract: APIContract, APIInput {
         return headers
     }
 
-    func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+    func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
     static func decode(
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self {
         Self(betaHeader: nil)
     }
@@ -207,13 +207,13 @@ final class APIContractTests: XCTestCase {
             }
             var queryParameters: [String: String]? { nil }
 
-            func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+            func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
             static func decode(
                 pathParameters: [String: String],
                 queryParameters: [String: String],
                 body: Data?,
-                decoder: JSONDecoder
+                decoder: any APIBodyDecoder
             ) throws -> Self {
                 Self(
                     userId: pathParameters["userId"] ?? "",
@@ -243,13 +243,13 @@ final class APIContractTests: XCTestCase {
             var pathParameters: [String: String] { ["id": id] }
             var queryParameters: [String: String]? { nil }
 
-            func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+            func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
             static func decode(
                 pathParameters: [String: String],
                 queryParameters: [String: String],
                 body: Data?,
-                decoder: JSONDecoder
+                decoder: any APIBodyDecoder
             ) throws -> Self {
                 Self(id: pathParameters["id"] ?? "")
             }
@@ -324,13 +324,13 @@ final class APIContractTests: XCTestCase {
                 ["q": query, "page": "\(page)"]
             }
 
-            func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+            func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
             static func decode(
                 pathParameters: [String: String],
                 queryParameters: [String: String],
                 body: Data?,
-                decoder: JSONDecoder
+                decoder: any APIBodyDecoder
             ) throws -> Self {
                 Self(query: queryParameters["q"] ?? "", page: Int(queryParameters["page"] ?? "0") ?? 0)
             }
@@ -445,13 +445,13 @@ final class APIInputTests: XCTestCase {
             var pathParameters: [String: String] { ["id": id] }
             var queryParameters: [String: String]? { ["name": name] }
 
-            func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+            func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 
             static func decode(
                 pathParameters: [String: String],
                 queryParameters: [String: String],
                 body: Data?,
-                decoder: JSONDecoder
+                decoder: any APIBodyDecoder
             ) throws -> Self {
                 Self(id: pathParameters["id"] ?? "", name: queryParameters["name"] ?? "")
             }

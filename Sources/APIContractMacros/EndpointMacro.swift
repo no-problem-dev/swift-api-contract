@@ -64,7 +64,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         let headerProperties = properties.filter { $0.kind == .header }
         members.append(generateAdditionalHeadersProperty(for: headerProperties))
 
-        // func encodeBody(using encoder: JSONEncoder) throws -> Data?
+        // func encodeBody(using encoder: any APIBodyEncoder) throws -> Data?
         let bodyProperty = properties.first { $0.kind == .body }
         members.append(generateEncodeBodyMethod(for: bodyProperty))
 
@@ -321,12 +321,12 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
     private static func generateEncodeBodyMethod(for bodyProperty: PropertyInfo?) -> DeclSyntax {
         guard let prop = bodyProperty else {
             return """
-            public func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+            public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
             """
         }
 
         return """
-        public func encodeBody(using encoder: JSONEncoder) throws -> Data? {
+        public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
             try encoder.encode(\(raw: prop.name))
         }
         """
@@ -369,7 +369,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
                 pathParameters: [String: String],
                 queryParameters: [String: String],
                 body: Data?,
-                decoder: JSONDecoder
+                decoder: any APIBodyDecoder
             ) throws -> Self {
                 Self()
             }
@@ -381,7 +381,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         lines.append("    pathParameters: [String: String],")
         lines.append("    queryParameters: [String: String],")
         lines.append("    body: Data?,")
-        lines.append("    decoder: JSONDecoder")
+        lines.append("    decoder: any APIBodyDecoder")
         lines.append(") throws -> Self {")
 
         // 各プロパティをデコード

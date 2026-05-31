@@ -11,21 +11,21 @@ public protocol APIInput: Sendable, Encodable {
     var queryParameters: [String: String]? { get }
 
     /// リクエストボディをエンコード
-    func encodeBody(using encoder: JSONEncoder) throws -> Data?
+    func encodeBody(using encoder: any APIBodyEncoder) throws -> Data?
 
     /// サーバーサイドでリクエストからInputをデコード
     static func decode(
         pathParameters: [String: String],
         queryParameters: [String: String],
         body: Data?,
-        decoder: JSONDecoder
+        decoder: any APIBodyDecoder
     ) throws -> Self
 }
 
 extension APIInput {
     public var pathParameters: [String: String] { [:] }
     public var queryParameters: [String: String]? { nil }
-    public func encodeBody(using encoder: JSONEncoder) throws -> Data? { nil }
+    public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? { nil }
 }
 
 extension APIInput {
