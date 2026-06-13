@@ -45,6 +45,12 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         // static let subPath: String
         members.append("public static let subPath: String = \"\(raw: arguments.path)\"")
 
+        // static let requiredScopes: [String] （スコープ指定があるときのみ。
+        // 未指定ならプロトコル拡張のデフォルト = Group.requiredScopes を継承）
+        if !arguments.scopes.isEmpty {
+            members.append("public static let requiredScopes: [String] = \(raw: stringArraySource(arguments.scopes))")
+        }
+
         // var pathParameters: [String: String]
         let pathParamProperties = properties.filter { $0.kind == .pathParam }
         if pathParamProperties.isEmpty {
@@ -123,6 +129,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
 
         var method: String = "get"
         var path: String = ""
+        var scopes: [String] = []
 
         for argument in arguments {
             if argument.label == nil {
@@ -135,10 +142,12 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
                    let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self) {
                     path = segment.content.text
                 }
+            } else if argument.label?.text == "scopes" {
+                scopes = parseStringArrayLiteral(from: argument.expression)
             }
         }
 
-        return EndpointArguments(method: method, path: path)
+        return EndpointArguments(method: method, path: path, scopes: scopes)
     }
 
     private static func collectProperties(from structDecl: StructDeclSyntax) throws -> [PropertyInfo] {
@@ -523,6 +532,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
 private struct EndpointArguments {
     let method: String
     let path: String
+    let scopes: [String]
 }
 
 struct PropertyInfo {

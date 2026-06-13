@@ -14,6 +14,13 @@ public protocol APIContract: Sendable {
     static var subPath: String { get }
     static var auth: AuthScheme { get }
 
+    /// このエンドポイントが必要とする OAuth スコープ
+    ///
+    /// `@Endpoint(..., scopes:)` で指定したスコープ。未指定なら所属グループの
+    /// `requiredScopes` を継承する。スコープ対応のトークンプロバイダ
+    /// (`ScopedAuthTokenProvider`) を使う APIClient が、トークン取得時にこの値を渡す。
+    static var requiredScopes: [String] { get }
+
     /// エンドポイント固有のHTTPヘッダー
     ///
     /// リクエストごとに動的に付与するヘッダー。
@@ -29,6 +36,9 @@ public protocol APIContract: Sendable {
 
 extension APIContract {
     public static var auth: AuthScheme { Group.auth }
+
+    /// デフォルトはグループの `requiredScopes` を継承する。
+    public static var requiredScopes: [String] { Group.requiredScopes }
 
     public var additionalHeaders: [String: String] { [:] }
 

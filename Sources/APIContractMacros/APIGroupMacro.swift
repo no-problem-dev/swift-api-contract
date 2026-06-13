@@ -37,6 +37,9 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
             members.append(DeclSyntax(stringLiteral: "public static let commonHeaders: [String: String] = [\(headerEntries)]"))
         }
 
+        // static let requiredScopes: [String]（グループ既定）
+        members.append(DeclSyntax(stringLiteral: "public static let requiredScopes: [String] = \(stringArraySource(arguments.scopes))"))
+
         // static let endpoints: [EndpointDescriptor]
         members.append(generateEndpointsProperty(for: endpointInfos))
 
@@ -98,6 +101,7 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         var path: String = ""
         var authExpression: String = ".bearer"
         var headers: [(String, String)] = []
+        var scopes: [String] = []
 
         for argument in arguments {
             switch argument.label?.text {
@@ -111,12 +115,14 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                 authExpression = argument.expression.trimmedDescription
             case "headers":
                 headers = parseDictionaryLiteral(from: argument.expression)
+            case "scopes":
+                scopes = parseStringArrayLiteral(from: argument.expression)
             default:
                 continue
             }
         }
 
-        return APIGroupArguments(path: path, authExpression: authExpression, headers: headers)
+        return APIGroupArguments(path: path, authExpression: authExpression, headers: headers, scopes: scopes)
     }
 
     /// [String: String] リテラルをパース
@@ -157,7 +163,7 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                     continue
                 }
 
-                let (method, path) = parseEndpointArguments(from: attr)
+                let (method, path, scopes) = parseEndpointArguments(from: attr)
                 let name = structDecl.name.text
                 let outputType = findOutputType(from: structDecl)
 
@@ -165,7 +171,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                     name: name,
                     method: method,
                     path: path,
-                    outputType: outputType
+                    outputType: outputType,
+                    scopes: scopes
                 ))
                 break
             }
@@ -174,12 +181,13 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         return endpoints
     }
 
-    private static func parseEndpointArguments(from attr: AttributeSyntax) -> (method: String, path: String) {
+    private static func parseEndpointArguments(from attr: AttributeSyntax) -> (method: String, path: String, scopes: [String]) {
         var method = "get"
         var path = ""
+        var scopes: [String] = []
 
         guard let arguments = attr.arguments?.as(LabeledExprListSyntax.self) else {
-            return (method, path)
+            return (method, path, scopes)
         }
 
         for argument in arguments {
@@ -192,10 +200,12 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                    let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self) {
                     path = segment.content.text
                 }
+            } else if argument.label?.text == "scopes" {
+                scopes = parseStringArrayLiteral(from: argument.expression)
             }
         }
 
-        return (method, path)
+        return (method, path, scopes)
     }
 
     private static func findOutputType(from structDecl: StructDeclSyntax) -> String {
@@ -215,9 +225,15 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         }
 
         let descriptors = endpoints.map { endpoint in
-            """
-            EndpointDescriptor(name: "\(endpoint.name)", method: .\(endpoint.method), subPath: "\(endpoint.path)")
-            """
+            if endpoint.scopes.isEmpty {
+                return """
+                EndpointDescriptor(name: "\(endpoint.name)", method: .\(endpoint.method), subPath: "\(endpoint.path)")
+                """
+            } else {
+                return """
+                EndpointDescriptor(name: "\(endpoint.name)", method: .\(endpoint.method), subPath: "\(endpoint.path)", requiredScopes: \(stringArraySource(endpoint.scopes)))
+                """
+            }
         }.joined(separator: ",\n        ")
 
         return DeclSyntax(stringLiteral: """
@@ -288,6 +304,7 @@ private struct APIGroupArguments {
     let path: String
     let authExpression: String
     let headers: [(String, String)]
+    let scopes: [String]
 }
 
 private struct EndpointInfo {
@@ -295,6 +312,7 @@ private struct EndpointInfo {
     let method: String
     let path: String
     let outputType: String
+    let scopes: [String]
 }
 
 // MARK: - Errors

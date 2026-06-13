@@ -8,6 +8,11 @@ public protocol APIContractGroup: Sendable {
     static var auth: AuthScheme { get }
     static var endpoints: [EndpointDescriptor] { get }
 
+    /// グループ内エンドポイントが必要とする OAuth スコープのデフォルト
+    ///
+    /// 各エンドポイントが独自に `requiredScopes` を指定しない場合に継承される。
+    static var requiredScopes: [String] { get }
+
     /// グループ共通ヘッダー
     ///
     /// グループ内の全エンドポイントに自動的に付与されるHTTPヘッダー。
@@ -23,6 +28,8 @@ public protocol APIContractGroup: Sendable {
 }
 
 extension APIContractGroup {
+    public static var requiredScopes: [String] { [] }
+
     public static var commonHeaders: [String: String] { [:] }
 
     public static func decodeError(statusCode: Int, data: Data, headers: [String: String], decoder: any APIBodyDecoder) -> (any Error)? {
@@ -43,15 +50,19 @@ public struct EndpointDescriptor: Sendable {
     public let method: APIMethod
     public let subPath: String
 
+    /// このエンドポイントが必要とする OAuth スコープ（空ならグループ既定を継承）。
+    public let requiredScopes: [String]
+
     public var fullPath: String {
         if subPath.isEmpty { return "" }
         if subPath.hasPrefix("/") { return subPath }
         return "/\(subPath)"
     }
 
-    public init(name: String, method: APIMethod, subPath: String) {
+    public init(name: String, method: APIMethod, subPath: String, requiredScopes: [String] = []) {
         self.name = name
         self.method = method
         self.subPath = subPath
+        self.requiredScopes = requiredScopes
     }
 }

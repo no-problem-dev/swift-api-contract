@@ -378,6 +378,8 @@ final class EndpointMacroTests: XCTestCase {
 
                 public static let commonHeaders: [String: String] = [:]
 
+                public static let requiredScopes: [String] = []
+
                 public static let endpoints: [EndpointDescriptor] = []
 
                 @discardableResult
@@ -416,6 +418,8 @@ final class EndpointMacroTests: XCTestCase {
 
                 public static let commonHeaders: [String: String] = ["anthropic-version": "2023-06-01"]
 
+                public static let requiredScopes: [String] = []
+
                 public static let endpoints: [EndpointDescriptor] = []
 
                 @discardableResult
@@ -428,6 +432,115 @@ final class EndpointMacroTests: XCTestCase {
             }
 
             extension AnthropicAPI: APIContractGroup {
+            }
+            """,
+            macros: testMacros
+        )
+        #else
+        throw XCTSkip("macros are only supported when running tests for the host platform")
+        #endif
+    }
+
+    // MARK: - Scope Tests
+
+    func testEndpointWithScopes() throws {
+        #if canImport(APIContractMacros)
+        assertMacroExpansion(
+            """
+            @Endpoint(.post, path: "/events", scopes: ["https://www.googleapis.com/auth/calendar"])
+            struct CreateEvent {
+                @Body var event: Event
+                typealias Output = Event
+            }
+            """,
+            expandedSource: """
+            struct CreateEvent {
+                var event: Event
+                typealias Output = Event
+
+                public typealias Input = Self
+
+                public static let method: APIMethod = .post
+
+                public static let subPath: String = "/events"
+
+                public static let requiredScopes: [String] = ["https://www.googleapis.com/auth/calendar"]
+
+                public var pathParameters: [String: String] {
+                    [:]
+                }
+
+                public var queryParameters: [String: String]? {
+                    nil
+                }
+
+                public var additionalHeaders: [String: String] {
+                    [:]
+                }
+
+                public func encodeBody(using encoder: any APIBodyEncoder) throws -> Data? {
+                    try encoder.encode(event)
+                }
+
+                public init(event: Event) {
+                    self.event = event
+                }
+
+                public static func decode(
+                    pathParameters: [String: String],
+                    queryParameters: [String: String],
+                    body: Data?,
+                    decoder: any APIBodyDecoder
+                ) throws -> Self {
+                    guard let bodyData = body else {
+                        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing request body"))
+                    }
+                    let event = try decoder.decode(Event.self, from: bodyData)
+                    return Self(event: event)
+                }
+            }
+
+            extension CreateEvent: APIContract, APIInput {
+            }
+            """,
+            macros: testMacros
+        )
+        #else
+        throw XCTSkip("macros are only supported when running tests for the host platform")
+        #endif
+    }
+
+    func testAPIGroupWithScopes() throws {
+        #if canImport(APIContractMacros)
+        assertMacroExpansion(
+            """
+            @APIGroup(path: "/calendar/v3", scopes: ["https://www.googleapis.com/auth/calendar.readonly"])
+            enum CalendarAPI {
+            }
+            """,
+            expandedSource: """
+            enum CalendarAPI {
+
+                public static let basePath: String = "/calendar/v3"
+
+                public static let auth: AuthScheme = .bearer
+
+                public static let commonHeaders: [String: String] = [:]
+
+                public static let requiredScopes: [String] = ["https://www.googleapis.com/auth/calendar.readonly"]
+
+                public static let endpoints: [EndpointDescriptor] = []
+
+                @discardableResult
+                    public static func registerAll<R: APIRouteRegistrar>(_ routes: R) -> R where R.Group == CalendarAPI, R.Service: CalendarAPIService {
+                        return routes
+                    }
+            }
+
+            public protocol CalendarAPIService: APIService where Group == CalendarAPI {
+            }
+
+            extension CalendarAPI: APIContractGroup {
             }
             """,
             macros: testMacros

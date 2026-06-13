@@ -1,20 +1,28 @@
 /// APIグループを定義するマクロ
-@attached(member, names: named(basePath), named(auth), named(commonHeaders), named(endpoints), named(registerAll))
+///
+/// `scopes` はグループ内の全エンドポイントが必要とする OAuth スコープのデフォルト。
+/// 各エンドポイントが `@Endpoint(..., scopes:)` で独自指定した場合はそちらが優先される。
+@attached(member, names: named(basePath), named(auth), named(commonHeaders), named(requiredScopes), named(endpoints), named(registerAll))
 @attached(extension, conformances: APIContractGroup)
 @attached(peer, names: suffixed(Service))
 public macro APIGroup(
     path: String,
     auth: AuthScheme = .bearer,
-    headers: [String: String] = [:]
+    headers: [String: String] = [:],
+    scopes: [String] = []
 ) = #externalMacro(module: "APIContractMacros", type: "APIGroupMacro")
 
 /// エンドポイントを定義するマクロ
+///
+/// `scopes` はこのエンドポイントが必要とする OAuth スコープ。空のときはグループの
+/// `requiredScopes` を継承する。
 @attached(extension, conformances: APIContract, APIInput)
 @attached(member, names:
     named(Input),
     named(Group),
     named(method),
     named(subPath),
+    named(requiredScopes),
     named(pathParameters),
     named(queryParameters),
     named(additionalHeaders),
@@ -24,7 +32,8 @@ public macro APIGroup(
 )
 public macro Endpoint(
     _ method: APIMethod,
-    path: String = ""
+    path: String = "",
+    scopes: [String] = []
 ) = #externalMacro(module: "APIContractMacros", type: "EndpointMacro")
 
 /// パスパラメータをマークするマクロ
@@ -71,6 +80,7 @@ public macro APIServices() = #externalMacro(module: "APIContractMacros", type: "
     named(Group),
     named(method),
     named(subPath),
+    named(requiredScopes),
     named(pathParameters),
     named(queryParameters),
     named(additionalHeaders),
@@ -80,5 +90,6 @@ public macro APIServices() = #externalMacro(module: "APIContractMacros", type: "
 )
 public macro StreamingEndpoint(
     _ method: APIMethod,
-    path: String = ""
+    path: String = "",
+    scopes: [String] = []
 ) = #externalMacro(module: "APIContractMacros", type: "StreamingEndpointMacro")
