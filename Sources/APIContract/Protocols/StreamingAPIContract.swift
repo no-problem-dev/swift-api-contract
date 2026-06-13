@@ -14,6 +14,9 @@ public protocol StreamingAPIContract: Sendable {
     static var subPath: String { get }
     static var auth: AuthScheme { get }
 
+    /// このストリーミングエンドポイントが必要とする OAuth スコープ（未指定ならグループ既定を継承）。
+    static var requiredScopes: [String] { get }
+
     /// エンドポイント固有のHTTPヘッダー
     var additionalHeaders: [String: String] { get }
 
@@ -24,6 +27,8 @@ public protocol StreamingAPIContract: Sendable {
 
 extension StreamingAPIContract {
     public static var auth: AuthScheme { Group.auth }
+
+    public static var requiredScopes: [String] { Group.requiredScopes }
 
     public var additionalHeaders: [String: String] { [:] }
 
