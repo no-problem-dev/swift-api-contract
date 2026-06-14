@@ -66,8 +66,10 @@ extension APIContract where Input == Self, Self: APIInput {
         encoder: any APIBodyEncoder = JSONEncoder.apiDefault
     ) throws -> URLRequest {
         let path = Self.resolvePath(with: self)
+        // 空パス時の末尾スラッシュ付与を回避(APIClientImpl と同じ理由)。
+        let requestURL = path.isEmpty ? baseURL : baseURL.appendingPathComponent(path)
         guard var urlComponents = URLComponents(
-            url: baseURL.appendingPathComponent(path),
+            url: requestURL,
             resolvingAgainstBaseURL: true
         ) else {
             throw ContractBuildError.invalidURL(path: path)
