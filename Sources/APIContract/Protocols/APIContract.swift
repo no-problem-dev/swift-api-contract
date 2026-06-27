@@ -42,6 +42,7 @@ extension APIContract {
 
     public var additionalHeaders: [String: String] { [:] }
 
+    /// グループの `basePath` とエンドポイントの `subPath` を結合した完全パステンプレート
     public static var pathTemplate: String {
         let base = Group.basePath
         if subPath.isEmpty { return base }
@@ -61,6 +62,15 @@ extension APIContract {
 }
 
 extension APIContract where Input == Self, Self: APIInput {
+    /// エンドポイントの定義から `URLRequest` を構築する
+    ///
+    /// パスパラメータの置換、クエリパラメータの付与、ボディのエンコード、
+    /// グループ共通ヘッダーとエンドポイント固有ヘッダーの適用を行います。
+    ///
+    /// - Parameters:
+    ///   - baseURL: API のベース URL
+    ///   - encoder: ボディのエンコードに使用するエンコーダ。デフォルトは ISO8601 日付形式の `JSONEncoder`
+    /// - Throws: `ContractBuildError.invalidURL` パスが無効な URL を形成する場合
     public func buildRequest(
         baseURL: URL,
         encoder: any APIBodyEncoder = JSONEncoder.apiDefault
@@ -118,6 +128,7 @@ extension APIContract where Input == Self, Self: APIInput, Output == EmptyOutput
 }
 
 extension JSONEncoder {
+    /// ISO8601 日付形式を使用するデフォルト設定の `JSONEncoder`
     public static var apiDefault: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -125,7 +136,9 @@ extension JSONEncoder {
     }
 }
 
+/// `buildRequest` が無効な URL を構築しようとしたときに throw されるエラー
 public enum ContractBuildError: Error, LocalizedError {
+    /// 指定されたパスが有効な URL を形成しない
     case invalidURL(path: String)
 
     public var errorDescription: String? {

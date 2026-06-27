@@ -23,7 +23,7 @@ A type-safe API contract definition library powered by Swift macros. Share API d
 import APIContract
 
 // Define an API group
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     // GET endpoint (list)
     @Endpoint(.get)
@@ -55,8 +55,8 @@ enum UsersAPI {
 ### Execute Requests
 
 ```swift
-// Use a client implementing APIExecutor protocol
-let client: APIExecutor = MyAPIClient(baseURL: "https://api.example.com")
+// Use a client implementing APIExecutable protocol
+let client: any APIExecutable = MyAPIClient(baseURL: URL(string: "https://api.example.com")!)
 
 // Create an endpoint
 let endpoint = UsersAPI.Get(userId: "123")
@@ -95,7 +95,7 @@ Add to your target:
 Groups related endpoints together.
 
 ```swift
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     // Endpoint definitions...
 }
@@ -104,7 +104,9 @@ enum UsersAPI {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | `String` | Base path for the group |
-| `auth` | `AuthRequirement` | Authentication requirement (`.none` / `.required`) |
+| `auth` | `AuthScheme` | Auth scheme (`.none` / `.bearer` / `.apiKey(headerName:)` / `.queryParam(name:)`) |
+| `headers` | `[String: String]` | Common headers applied to all endpoints in the group |
+| `scopes` | `[String]` | Default OAuth scopes for the group |
 
 ### @Endpoint
 
@@ -121,7 +123,8 @@ struct GetUser {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `method` | `APIMethod` | HTTP method |
-| `path` | `String?` | Sub-path (optional) |
+| `path` | `String` | Sub-path (default: `""`) |
+| `scopes` | `[String]` | OAuth scopes for this endpoint (inherits group default when empty) |
 
 ### @PathParam
 
@@ -137,7 +140,7 @@ Marks a query parameter. Custom parameter names are supported.
 
 ```swift
 @QueryParam var limit: Int?
-@QueryParam("page_size") var pageSize: Int?
+@QueryParam(name: "page_size") var pageSize: Int?
 ```
 
 ### @Body
@@ -198,24 +201,26 @@ services.registerAll(server.routes)
 | `EmptyInput` | For endpoints without parameters |
 | `EmptyOutput` | For endpoints without response body |
 
-## Implementing APIExecutor (Client)
+## Implementing APIExecutable (Client)
+
+Only `executeWithResponse` needs to be implemented; `execute` overloads are provided as default extensions.
 
 ```swift
-struct MyAPIClient: APIExecutor {
-    let baseURL: String
+struct MyAPIClient: APIExecutable {
+    let baseURL: URL
     let session: URLSession
 
-    func execute<E: APIContract>(_ endpoint: E) async throws -> E.Output
-    where E.Output: Decodable {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
-        let (data, _) = try await session.data(for: request)
-        return try JSONDecoder().decode(E.Output.self, from: data)
-    }
-
-    func execute<E: APIContract>(_ endpoint: E) async throws
-    where E.Output == EmptyOutput {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
-        _ = try await session.data(for: request)
+    func executeWithResponse<E: APIContract>(_ contract: E) async throws -> APIResponse<E.Output>
+        where E.Input == E, E: APIInput
+    {
+        let request = try contract.buildRequest(baseURL: baseURL)
+        let (data, response) = try await session.data(for: request)
+        let httpResponse = response as! HTTPURLResponse
+        let headers = httpResponse.allHeaderFields
+            .compactMapValues { $0 as? String }
+            .reduce(into: [String: String]()) { $0[$1.key as! String] = $1.value }
+        let output = try JSONDecoder().decode(E.Output.self, from: data)
+        return APIResponse(output: output, statusCode: httpResponse.statusCode, headers: headers)
     }
 }
 ```
@@ -225,7 +230,7 @@ struct MyAPIClient: APIExecutor {
 The `@APIGroup` macro auto-generates a corresponding Service protocol.
 
 ```swift
-// @APIGroup(path: "/v1/users", auth: .required)
+// @APIGroup(path: "/v1/users", auth: .bearer)
 // enum UsersAPI { ... }
 // ↓ Auto-generated
 // protocol UsersAPIService: APIService where Group == UsersAPI { ... }

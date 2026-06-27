@@ -23,7 +23,7 @@ Swiftマクロを活用した型安全なAPIコントラクト定義ライブラ
 import APIContract
 
 // APIグループの定義
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     // GETエンドポイント（一覧取得）
     @Endpoint(.get)
@@ -55,8 +55,8 @@ enum UsersAPI {
 ### リクエストの実行
 
 ```swift
-// APIExecutorプロトコルを実装したクライアントを使用
-let client: APIExecutor = MyAPIClient(baseURL: "https://api.example.com")
+// APIExecutableプロトコルを実装したクライアントを使用
+let client: any APIExecutable = MyAPIClient(baseURL: URL(string: "https://api.example.com")!)
 
 // エンドポイントを作成
 let endpoint = UsersAPI.Get(userId: "123")
@@ -95,7 +95,7 @@ dependencies: [
 関連するエンドポイントをグループ化します。
 
 ```swift
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     // エンドポイント定義...
 }
@@ -104,7 +104,9 @@ enum UsersAPI {
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
 | `path` | `String` | グループの基本パス |
-| `auth` | `AuthRequirement` | 認証要件（`.none` / `.required`） |
+| `auth` | `AuthScheme` | 認証方式（`.none` / `.bearer` / `.apiKey(headerName:)` / `.queryParam(name:)`） |
+| `headers` | `[String: String]` | グループ共通ヘッダー |
+| `scopes` | `[String]` | グループ既定 OAuth スコープ |
 
 ### @Endpoint
 
@@ -121,7 +123,8 @@ struct GetUser {
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
 | `method` | `APIMethod` | HTTPメソッド |
-| `path` | `String?` | サブパス（オプション） |
+| `path` | `String` | サブパス（デフォルト: `""`） |
+| `scopes` | `[String]` | このエンドポイントの OAuth スコープ（空ならグループ既定を継承） |
 
 ### @PathParam
 
@@ -137,7 +140,7 @@ struct GetUser {
 
 ```swift
 @QueryParam var limit: Int?
-@QueryParam("page_size") var pageSize: Int?
+@QueryParam(name: "page_size") var pageSize: Int?
 ```
 
 ### @Body
@@ -198,24 +201,26 @@ services.registerAll(server.routes)
 | `EmptyInput` | パラメータなしのエンドポイント用 |
 | `EmptyOutput` | レスポンスボディなしのエンドポイント用 |
 
-## APIExecutorの実装（クライアント）
+## APIExecutableの実装（クライアント）
+
+`APIExecutable` プロトコルの必須メソッドは `executeWithResponse` のみ。`execute` の各オーバーロードはデフォルト実装が提供される。
 
 ```swift
-struct MyAPIClient: APIExecutor {
-    let baseURL: String
+struct MyAPIClient: APIExecutable {
+    let baseURL: URL
     let session: URLSession
 
-    func execute<E: APIContract>(_ endpoint: E) async throws -> E.Output
-    where E.Output: Decodable {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
-        let (data, _) = try await session.data(for: request)
-        return try JSONDecoder().decode(E.Output.self, from: data)
-    }
-
-    func execute<E: APIContract>(_ endpoint: E) async throws
-    where E.Output == EmptyOutput {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
-        _ = try await session.data(for: request)
+    func executeWithResponse<E: APIContract>(_ contract: E) async throws -> APIResponse<E.Output>
+        where E.Input == E, E: APIInput
+    {
+        let request = try contract.buildRequest(baseURL: baseURL)
+        let (data, response) = try await session.data(for: request)
+        let statusCode = (response as! HTTPURLResponse).statusCode
+        let headers = (response as! HTTPURLResponse).allHeaderFields
+            .compactMapValues { $0 as? String }
+            .reduce(into: [String: String]()) { $0[$1.key as! String] = $1.value }
+        let output = try JSONDecoder().decode(E.Output.self, from: data)
+        return APIResponse(output: output, statusCode: statusCode, headers: headers)
     }
 }
 ```
@@ -225,7 +230,7 @@ struct MyAPIClient: APIExecutor {
 `@APIGroup`マクロは対応するServiceプロトコルを自動生成します。
 
 ```swift
-// @APIGroup(path: "/v1/users", auth: .required)
+// @APIGroup(path: "/v1/users", auth: .bearer)
 // enum UsersAPI { ... }
 // ↓ 自動生成
 // protocol UsersAPIService: APIService where Group == UsersAPI { ... }
