@@ -1,6 +1,6 @@
 # はじめに
 
-APIContractを使用してAPIエンドポイントを定義する方法を学びます。
+APIContractを使用してAPIエンドポイントを定義・実行する基本ガイド。
 
 @Metadata {
     @PageColor(blue)
@@ -8,15 +8,15 @@ APIContractを使用してAPIエンドポイントを定義する方法を学び
 
 ## Overview
 
-このガイドでは、APIContractを使用してAPIエンドポイントを定義し、実行する基本的な方法を説明します。
+APIContractを使用してAPIエンドポイントを定義し、実行する基本的な方法を解説する。
 
 ## インストール
 
-Swift Package Managerを使用してインストールします。
+Swift Package Managerで追加する。
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "1.0.0")
+    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "2.1.2")
 ]
 ```
 
@@ -35,7 +35,7 @@ dependencies: [
 
 ### シンプルなGETエンドポイント
 
-最もシンプルなエンドポイントは、パラメータなしのGETリクエストです。
+最もシンプルなエンドポイントは、パラメータなしのGETリクエスト。
 
 ```swift
 import APIContract
@@ -48,7 +48,7 @@ struct ListUsers {
 
 ### パスパラメータを持つエンドポイント
 
-パスパラメータは`@PathParam`でマークします。
+パスパラメータは`@PathParam`でマークする。
 
 ```swift
 @Endpoint(.get, path: ":userId")
@@ -60,14 +60,14 @@ struct GetUser {
 
 ### クエリパラメータを持つエンドポイント
 
-クエリパラメータは`@QueryParam`でマークします。
+クエリパラメータは`@QueryParam`でマークする。
 
 ```swift
 @Endpoint(.get)
 struct SearchUsers {
     @QueryParam var query: String
     @QueryParam var limit: Int?
-    @QueryParam("page_size") var pageSize: Int?  // カスタム名
+    @QueryParam(name: "page_size") var pageSize: Int?  // カスタム名
 
     typealias Output = [User]
 }
@@ -75,7 +75,7 @@ struct SearchUsers {
 
 ### リクエストボディを持つエンドポイント
 
-リクエストボディは`@Body`でマークします。
+リクエストボディは`@Body`でマークする。
 
 ```swift
 @Endpoint(.post)
@@ -87,10 +87,10 @@ struct CreateUser {
 
 ## APIグループの定義
 
-関連するエンドポイントは`@APIGroup`でグループ化できます。
+関連するエンドポイントは`@APIGroup`でグループ化できる。
 
 ```swift
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     @Endpoint(.get)
     struct List {
@@ -120,26 +120,27 @@ enum UsersAPI {
 
 ## エンドポイントの実行
 
-### APIExecutorの実装
+### APIExecutableの実装
 
-まず、`APIExecutor`プロトコルを実装したクライアントを作成します。
+`APIExecutable` プロトコルを実装したクライアントを作成する。
+実装が必要なのは `executeWithResponse` のみ。`execute` の各オーバーロードはデフォルト実装が提供される。
 
 ```swift
-struct MyAPIClient: APIExecutor {
-    let baseURL: String
+struct MyAPIClient: APIExecutable {
+    let baseURL: URL
     let session: URLSession
 
-    func execute<E: APIContract>(_ endpoint: E) async throws -> E.Output
-    where E.Output: Decodable {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
-        let (data, _) = try await session.data(for: request)
-        return try JSONDecoder().decode(E.Output.self, from: data)
-    }
-
-    func execute<E: APIContract>(_ endpoint: E) async throws
-    where E.Output == EmptyOutput {
-        let request = try endpoint.urlRequest(baseURL: baseURL)
-        _ = try await session.data(for: request)
+    func executeWithResponse<E: APIContract>(_ contract: E) async throws -> APIResponse<E.Output>
+    where E.Input == E, E: APIInput
+    {
+        let request = try contract.buildRequest(baseURL: baseURL)
+        let (data, response) = try await session.data(for: request)
+        let httpResponse = response as! HTTPURLResponse
+        let headers = httpResponse.allHeaderFields
+            .compactMapValues { $0 as? String }
+            .reduce(into: [String: String]()) { $0[$1.key as! String] = $1.value }
+        let output = try JSONDecoder().decode(E.Output.self, from: data)
+        return APIResponse(output: output, statusCode: httpResponse.statusCode, headers: headers)
     }
 }
 ```
@@ -147,8 +148,8 @@ struct MyAPIClient: APIExecutor {
 ### リクエストの実行
 
 ```swift
-let client = MyAPIClient(
-    baseURL: "https://api.example.com",
+let client: any APIExecutable = MyAPIClient(
+    baseURL: URL(string: "https://api.example.com")!,
     session: .shared
 )
 
@@ -160,7 +161,7 @@ let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
 // 新しいユーザーを作成
 let newUser = try await UsersAPI.Create(
-    body: CreateUserRequest(name: "John", email: "john@example.com")
+    body: CreateUserRequest(name: "田中", email: "tanaka@example.com")
 ).execute(using: client)
 ```
 

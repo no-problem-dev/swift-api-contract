@@ -3,8 +3,8 @@ import SwiftSyntaxMacros
 
 /// クエリパラメータをマークするマクロ
 ///
-/// マーカーとして機能し、`@Endpoint` マクロがプロパティを
-/// クエリパラメータとして認識するために使用されます。
+/// `@Endpoint` マクロがプロパティをクエリパラメータとして認識するためのマーカー。
+/// 単体では何も生成しない。
 public struct QueryParamMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,

@@ -4,7 +4,7 @@ import SwiftSyntaxMacros
 
 /// エンドポイントを定義するマクロ
 ///
-/// structに付与して、`APIContract` と `APIInput` への準拠を自動生成します。
+/// struct に付与して `APIContract` と `APIInput` への準拠を自動生成する。
 public struct EndpointMacro: MemberMacro, ExtensionMacro {
 
     // MARK: - MemberMacro

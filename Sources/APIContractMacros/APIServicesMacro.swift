@@ -3,8 +3,8 @@ import SwiftSyntaxMacros
 
 /// 複数のAPIサービスをグループ化するマクロ
 ///
-/// structに付与して、`registerAll` メソッドを自動生成します。
-/// 各プロパティの型から `Service.Group.registerAll()` を呼び出すコードを生成します。
+/// struct に付与して `registerAll` メソッドを自動生成する。
+/// 各プロパティ型の `Service.Group.registerAll()` を呼び出すコードを生成する。
 public struct APIServicesMacro: MemberMacro {
 
     public static func expansion(

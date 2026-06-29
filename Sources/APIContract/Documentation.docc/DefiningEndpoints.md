@@ -8,11 +8,11 @@ APIContractでエンドポイントを定義する詳細なガイド。
 
 ## Overview
 
-このガイドでは、APIContractの各マクロの詳細な使い方と、様々なパターンのエンドポイント定義を説明します。
+APIContractの各マクロの詳細な使い方と、様々なパターンのエンドポイント定義を解説する。
 
 ## @Endpointマクロ
 
-`@Endpoint`マクロは、構造体をAPIエンドポイントに変換します。
+`@Endpoint`マクロは、構造体をAPIエンドポイントに変換する。
 
 ### 基本構文
 
@@ -40,7 +40,7 @@ struct EndpointName {
 
 ### パス指定
 
-パスは省略可能です。省略した場合、グループのベースパスが使用されます。
+`path` は省略可能。省略した場合はグループのベースパスのみ使われる。
 
 ```swift
 // パスなし → グループのベースパスのみ
@@ -60,7 +60,7 @@ struct GetComments { ... }
 
 ### @PathParam
 
-URLパス内のプレースホルダーに対応するパラメータを定義します。
+URLパス内のプレースホルダーに対応するパラメータを定義する。
 
 ```swift
 @Endpoint(.get, path: ":userId/posts/:postId")
@@ -71,31 +71,31 @@ struct GetPost {
     typealias Output = Post
 }
 
-// 生成されるパス: /users/123/posts/456
+// 生成されるパス: /123/posts/456
 let endpoint = GetPost(userId: "123", postId: "456")
 ```
 
 ### @QueryParam
 
-URLクエリパラメータを定義します。
+URLクエリパラメータを定義する。
 
 ```swift
 @Endpoint(.get)
 struct SearchUsers {
-    @QueryParam var query: String          // 必須
-    @QueryParam var limit: Int?            // オプション
-    @QueryParam("page_size") var pageSize: Int?  // カスタム名
+    @QueryParam var query: String              // 必須
+    @QueryParam var limit: Int?               // オプション
+    @QueryParam(name: "page_size") var pageSize: Int?  // カスタム名
 
     typealias Output = [User]
 }
 
-// 生成されるURL: /users?query=john&limit=10&page_size=20
+// 生成されるクエリ: ?query=john&limit=10&page_size=20
 let endpoint = SearchUsers(query: "john", limit: 10, pageSize: 20)
 ```
 
 ### @Body
 
-リクエストボディを定義します。`Encodable`に準拠した型を使用します。
+リクエストボディを定義する。`Encodable` に準拠した型を使う。
 
 ```swift
 struct CreateUserRequest: Codable {
@@ -111,14 +111,14 @@ struct CreateUser {
 }
 
 // リクエストボディがJSON形式でエンコードされる
-let endpoint = CreateUser(body: CreateUserRequest(name: "John", email: "john@example.com"))
+let endpoint = CreateUser(body: CreateUserRequest(name: "田中", email: "tanaka@example.com"))
 ```
 
 ## 型サポート
 
 ### パラメータで使用可能な型
 
-以下の型がパスパラメータとクエリパラメータで使用できます：
+以下の型がパスパラメータとクエリパラメータで使用できる：
 
 - **文字列**: `String`
 - **整数**: `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`
@@ -145,7 +145,7 @@ struct FilterUsers {
 
 #### EmptyInput
 
-パラメータなしのエンドポイントに使用します。
+パラメータなしのエンドポイントに使う。
 
 ```swift
 @Endpoint(.get)
@@ -156,7 +156,7 @@ struct GetServerStatus {
 
 #### EmptyOutput
 
-レスポンスボディがないエンドポイント（DELETEなど）に使用します。
+レスポンスボディがないエンドポイント（DELETEなど）に使う。
 
 ```swift
 @Endpoint(.delete, path: ":id")
@@ -168,29 +168,31 @@ struct DeleteUser {
 
 ## @APIGroupマクロ
 
-関連するエンドポイントをグループ化し、共通のベースパスと認証設定を定義します。
+関連するエンドポイントをグループ化し、共通のベースパスと認証設定を定義する。
 
 ### 基本構文
 
 ```swift
-@APIGroup(path: "/v1/resource", auth: .required)
+@APIGroup(path: "/v1/resource", auth: .bearer)
 enum ResourceAPI {
     // エンドポイント定義
 }
 ```
 
-### 認証要件
+### 認証方式（AuthScheme）
 
 | 値 | 説明 |
 |----|------|
 | `.none` | 認証不要 |
-| `.required` | 認証必要 |
+| `.bearer` | Bearer トークン（Authorization: Bearer \<token\>） |
+| `.apiKey(headerName:)` | API Key ヘッダー（例: x-api-key） |
+| `.queryParam(name:)` | クエリパラメータ（例: ?key=...） |
 
 ### グループ化の例
 
 ```swift
 // ユーザーAPI
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     @Endpoint(.get) struct List { ... }
     @Endpoint(.get, path: ":id") struct Get { ... }
@@ -231,7 +233,7 @@ struct UpdateUserRequest: Codable {
 }
 
 // API定義
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     @Endpoint(.get)
     struct List {

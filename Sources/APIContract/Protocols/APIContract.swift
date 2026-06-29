@@ -65,7 +65,7 @@ extension APIContract where Input == Self, Self: APIInput {
     /// エンドポイントの定義から `URLRequest` を構築する
     ///
     /// パスパラメータの置換、クエリパラメータの付与、ボディのエンコード、
-    /// グループ共通ヘッダーとエンドポイント固有ヘッダーの適用を行います。
+    /// グループ共通ヘッダーとエンドポイント固有ヘッダーを適用する。
     ///
     /// - Parameters:
     ///   - baseURL: API のベース URL

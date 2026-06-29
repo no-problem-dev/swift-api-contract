@@ -3,8 +3,8 @@ import SwiftSyntaxMacros
 
 /// HTTPヘッダーをマークするマクロ
 ///
-/// マーカーとして機能し、`@Endpoint` マクロがプロパティを
-/// HTTPヘッダーとして認識するために使用されます。
+/// `@Endpoint` マクロがプロパティを HTTPヘッダーとして認識するためのマーカー。
+/// 単体では何も生成しない。
 public struct HeaderMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,

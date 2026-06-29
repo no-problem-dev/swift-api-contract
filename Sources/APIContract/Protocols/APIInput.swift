@@ -2,7 +2,7 @@ import Foundation
 
 /// APIリクエストの入力を表すプロトコル
 ///
-/// パスパラメータ、クエリパラメータ、リクエストボディを統一的に扱います。
+/// パスパラメータ、クエリパラメータ、リクエストボディを統一的に扱う。
 public protocol APIInput: Sendable, Encodable {
     /// パスパラメータ（`:paramName` を置換）
     var pathParameters: [String: String] { get }

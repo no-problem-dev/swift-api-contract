@@ -3,8 +3,8 @@ import SwiftSyntaxMacros
 
 /// リクエストボディをマークするマクロ
 ///
-/// マーカーとして機能し、`@Endpoint` マクロがプロパティを
-/// リクエストボディとして認識するために使用されます。
+/// `@Endpoint` マクロがプロパティをリクエストボディとして認識するためのマーカー。
+/// 単体では何も生成しない。
 public struct BodyMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,

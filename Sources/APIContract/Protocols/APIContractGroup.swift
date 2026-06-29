@@ -1,11 +1,19 @@
 import Foundation
 
-/// APIエンドポイントのグループを表すプロトコル
+/// APIエンドポイントのグループを定義するプロトコル
 ///
-/// `@APIGroup`マクロで定義されたenumが準拠します。
+/// `@APIGroup` マクロで定義した enum が自動的に準拠する。
 public protocol APIContractGroup: Sendable {
+    /// グループ内全エンドポイントに共通するURLパスプレフィックス（例: `/v1/users`）。
+    /// 各エンドポイントの `subPath` と結合して最終的なリクエストパスになる。
     static var basePath: String { get }
+
+    /// グループ内全エンドポイントで使用する認証方式。
+    /// `@APIGroup(auth:)` の引数から自動設定され、デフォルトは `.bearer`。
     static var auth: AuthScheme { get }
+
+    /// グループに属する全エンドポイントのメタ情報一覧。
+    /// `@APIGroup` マクロが各 `@Endpoint` を走査して自動生成する。
     static var endpoints: [EndpointDescriptor] { get }
 
     /// グループ内エンドポイントが必要とする OAuth スコープのデフォルト

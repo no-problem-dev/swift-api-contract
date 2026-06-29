@@ -3,8 +3,8 @@ import SwiftSyntaxMacros
 
 /// パスパラメータをマークするマクロ
 ///
-/// マーカーとして機能し、`@Endpoint` マクロがプロパティを
-/// パスパラメータとして認識するために使用されます。
+/// `@Endpoint` マクロがプロパティをパスパラメータとして認識するためのマーカー。
+/// 単体では何も生成しない。
 public struct PathParamMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,

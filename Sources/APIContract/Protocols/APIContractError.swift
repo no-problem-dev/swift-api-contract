@@ -2,7 +2,7 @@ import Foundation
 
 /// API契約エラーを表すプロトコル
 ///
-/// クライアント・サーバー間で一貫したエラーハンドリングを提供します。
+/// クライアント・サーバー間の一貫したエラーハンドリングを実現する。
 public protocol APIContractError: Error, Codable, Sendable {
     var statusCode: Int { get }
     var errorCode: String { get }

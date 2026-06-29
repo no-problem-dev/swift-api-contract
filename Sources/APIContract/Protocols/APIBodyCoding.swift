@@ -1,16 +1,15 @@
 import Foundation
 
-/// Encodes a request body to bytes.
+/// リクエストボディをバイト列にエンコードするプロトコル
 ///
-/// The Codec seam: API definitions depend on this abstraction instead of a
-/// concrete `JSONEncoder`, so the client layer can supply any
-/// implementation (Foundation, swift-structured-data, …) without API authors
-/// knowing or choosing. Authors still only write `Encodable` types.
+/// コーデック抽象化点: API 定義はこの抽象に依存し、具体的な `JSONEncoder` は選ばない。
+/// クライアント層が Foundation・swift-structured-data など任意の実装を提供でき、
+/// API 定義者は `Encodable` 型の記述だけに集中できる。
 public protocol APIBodyEncoder: Sendable {
     func encode<T: Encodable>(_ value: T) throws -> Data
 }
 
-/// Decodes bytes into a response/body type.
+/// バイト列をレスポンス/ボディ型にデコードするプロトコル。
 public protocol APIBodyDecoder: Sendable {
     func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T
 }

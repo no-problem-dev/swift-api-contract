@@ -1,31 +1,31 @@
 # APIContract
 
-[English](README_EN.md) | 日本語
+English | [日本語](./README.ja.md)
 
-Swiftマクロを活用した型安全なAPIコントラクト定義ライブラリ。クライアントとサーバー間のAPI定義を共通化し、コンパイル時の型チェックを実現します。
+A type-safe API contract definition library powered by Swift macros. Share API definitions between client and server with compile-time type checking.
 
 ![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)
 ![iOS 17+](https://img.shields.io/badge/iOS-17+-blue.svg)
 ![macOS 14+](https://img.shields.io/badge/macOS-14+-purple.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-## 特徴
+## Features
 
-- **型安全なAPI定義**: コンパイル時にエンドポイントの入出力型をチェック
-- **Swiftマクロ**: `@Endpoint`、`@APIGroup`マクロによる宣言的なAPI定義
-- **自動コード生成**: パスパラメータ、クエリパラメータ、ボディのエンコード処理を自動生成
-- **グループ化**: 関連するエンドポイントを論理的にグループ化
-- **Async/Await対応**: モダンな非同期処理との統合
+- **Type-Safe API Definitions**: Compile-time validation of endpoint input/output types
+- **Swift Macros**: Declarative API definitions with `@Endpoint` and `@APIGroup` macros
+- **Auto Code Generation**: Automatic encoding for path parameters, query parameters, and body
+- **Grouping**: Logically group related endpoints
+- **Async/Await Support**: Modern concurrency integration
 
-## クイックスタート
+## Quick Start
 
 ```swift
 import APIContract
 
-// APIグループの定義
+// Define an API group
 @APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
-    // GETエンドポイント（一覧取得）
+    // GET endpoint (list)
     @Endpoint(.get)
     struct List {
         @QueryParam var limit: Int?
@@ -34,7 +34,7 @@ enum UsersAPI {
         typealias Output = [User]
     }
 
-    // GETエンドポイント（単一取得）
+    // GET endpoint (single item)
     @Endpoint(.get, path: ":userId")
     struct Get {
         @PathParam var userId: String
@@ -42,7 +42,7 @@ enum UsersAPI {
         typealias Output = User
     }
 
-    // POSTエンドポイント（作成）
+    // POST endpoint (create)
     @Endpoint(.post)
     struct Create {
         @Body var body: CreateUserRequest
@@ -52,32 +52,32 @@ enum UsersAPI {
 }
 ```
 
-### リクエストの実行
+### Execute Requests
 
 ```swift
-// APIExecutableプロトコルを実装したクライアントを使用
+// Use a client implementing APIExecutable protocol
 let client: any APIExecutable = MyAPIClient(baseURL: URL(string: "https://api.example.com")!)
 
-// エンドポイントを作成
+// Create an endpoint
 let endpoint = UsersAPI.Get(userId: "123")
 
-// 実行（型安全なレスポンス）
+// Execute (type-safe response)
 let user: User = try await endpoint.execute(using: client)
 ```
 
-## インストール
+## Installation
 
 ### Swift Package Manager
 
-`Package.swift` に以下を追加：
+Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "1.0.0")
+    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "2.1.2")
 ]
 ```
 
-ターゲットに追加：
+Add to your target:
 
 ```swift
 .target(
@@ -88,29 +88,29 @@ dependencies: [
 )
 ```
 
-## マクロ一覧
+## Macros
 
 ### @APIGroup
 
-関連するエンドポイントをグループ化します。
+Groups related endpoints together.
 
 ```swift
 @APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
-    // エンドポイント定義...
+    // Endpoint definitions...
 }
 ```
 
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| `path` | `String` | グループの基本パス |
-| `auth` | `AuthScheme` | 認証方式（`.none` / `.bearer` / `.apiKey(headerName:)` / `.queryParam(name:)`） |
-| `headers` | `[String: String]` | グループ共通ヘッダー |
-| `scopes` | `[String]` | グループ既定 OAuth スコープ |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `path` | `String` | Base path for the group |
+| `auth` | `AuthScheme` | Auth scheme (`.none` / `.bearer` / `.apiKey(headerName:)` / `.queryParam(name:)`) |
+| `headers` | `[String: String]` | Common headers applied to all endpoints in the group |
+| `scopes` | `[String]` | Default OAuth scopes for the group |
 
 ### @Endpoint
 
-エンドポイントを定義します。
+Defines an endpoint.
 
 ```swift
 @Endpoint(.get, path: ":id")
@@ -120,15 +120,15 @@ struct GetUser {
 }
 ```
 
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| `method` | `APIMethod` | HTTPメソッド |
-| `path` | `String` | サブパス（デフォルト: `""`） |
-| `scopes` | `[String]` | このエンドポイントの OAuth スコープ（空ならグループ既定を継承） |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `method` | `APIMethod` | HTTP method |
+| `path` | `String` | Sub-path (default: `""`) |
+| `scopes` | `[String]` | OAuth scopes for this endpoint (inherits group default when empty) |
 
 ### @PathParam
 
-パスパラメータをマークします。
+Marks a path parameter.
 
 ```swift
 @PathParam var userId: String
@@ -136,7 +136,7 @@ struct GetUser {
 
 ### @QueryParam
 
-クエリパラメータをマークします。カスタムパラメータ名も指定可能。
+Marks a query parameter. Custom parameter names are supported.
 
 ```swift
 @QueryParam var limit: Int?
@@ -145,15 +145,35 @@ struct GetUser {
 
 ### @Body
 
-リクエストボディをマークします。
+Marks the request body.
 
 ```swift
 @Body var body: CreateUserRequest
 ```
 
+### @Header
+
+Marks a dynamic HTTP header added per request.
+
+```swift
+@Header("anthropic-beta") var beta: String?
+```
+
+### @StreamingEndpoint
+
+Defines a streaming endpoint. Uses `Event` type instead of `Output`.
+
+```swift
+@StreamingEndpoint(.post, path: "messages")
+struct StreamMessages {
+    @Body var request: MessageRequest
+    typealias Event = MessageDelta
+}
+```
+
 ### @APIServices
 
-複数のAPIサービスを一括登録します。
+Groups multiple API services for bulk registration.
 
 ```swift
 @APIServices
@@ -162,48 +182,48 @@ struct AppServices {
     let posts: PostsService
 }
 
-// 生成されるメソッド:
+// Generated method:
 // func registerAll<R: Routes>(_ routes: R) { ... }
 
-// 使用例:
+// Usage:
 services.registerAll(server.routes)
 ```
 
-## HTTPメソッド
+## HTTP Methods
 
-| メソッド | 用途 |
-|---------|------|
-| `.get` | リソースの取得 |
-| `.post` | リソースの作成 |
-| `.put` | リソースの完全更新 |
-| `.patch` | リソースの部分更新 |
-| `.delete` | リソースの削除 |
-| `.head` | ヘッダーのみ取得 |
-| `.options` | 許可メソッドの確認 |
+| Method | Usage |
+|--------|-------|
+| `.get` | Retrieve resources |
+| `.post` | Create resources |
+| `.put` | Full resource update |
+| `.patch` | Partial resource update |
+| `.delete` | Delete resources |
+| `.head` | Retrieve headers only |
+| `.options` | Check allowed methods |
 
-## 型サポート
+## Type Support
 
-### パラメータで使用可能な型
+### Parameter Types
 
 - `String`
 - `Int`, `Int8`, `Int16`, `Int32`, `Int64`
 - `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`
 - `Double`, `Float`
 - `Bool`
-- `Date`（ISO8601形式で自動変換）
-- `RawRepresentable`な型（enumなど）
-- 上記のOptional型
+- `Date` (auto-converted to ISO8601 format)
+- `RawRepresentable` types (enums, etc.)
+- Optional versions of all above
 
-### 特殊な型
+### Special Types
 
-| 型 | 説明 |
-|----|------|
-| `EmptyInput` | パラメータなしのエンドポイント用 |
-| `EmptyOutput` | レスポンスボディなしのエンドポイント用 |
+| Type | Description |
+|------|-------------|
+| `EmptyInput` | For endpoints without parameters |
+| `EmptyOutput` | For endpoints without response body |
 
-## APIExecutableの実装（クライアント）
+## Implementing APIExecutable (Client)
 
-`APIExecutable` プロトコルの必須メソッドは `executeWithResponse` のみ。`execute` の各オーバーロードはデフォルト実装が提供される。
+Only `executeWithResponse` needs to be implemented; `execute` overloads are provided as default extensions.
 
 ```swift
 struct MyAPIClient: APIExecutable {
@@ -215,51 +235,51 @@ struct MyAPIClient: APIExecutable {
     {
         let request = try contract.buildRequest(baseURL: baseURL)
         let (data, response) = try await session.data(for: request)
-        let statusCode = (response as! HTTPURLResponse).statusCode
-        let headers = (response as! HTTPURLResponse).allHeaderFields
+        let httpResponse = response as! HTTPURLResponse
+        let headers = httpResponse.allHeaderFields
             .compactMapValues { $0 as? String }
             .reduce(into: [String: String]()) { $0[$1.key as! String] = $1.value }
         let output = try JSONDecoder().decode(E.Output.self, from: data)
-        return APIResponse(output: output, statusCode: statusCode, headers: headers)
+        return APIResponse(output: output, statusCode: httpResponse.statusCode, headers: headers)
     }
 }
 ```
 
-## APIServiceの実装（サーバー）
+## Implementing APIService (Server)
 
-`@APIGroup`マクロは対応するServiceプロトコルを自動生成します。
+The `@APIGroup` macro auto-generates a corresponding Service protocol.
 
 ```swift
 // @APIGroup(path: "/v1/users", auth: .bearer)
 // enum UsersAPI { ... }
-// ↓ 自動生成
+// ↓ Auto-generated
 // protocol UsersAPIService: APIService where Group == UsersAPI { ... }
 
 struct UsersService: UsersAPIService {
     func handle(_ input: UsersAPI.List, context: ServiceContext) async throws -> [User] {
-        // 実装
+        // Implementation
     }
 
     func handle(_ input: UsersAPI.Get, context: ServiceContext) async throws -> User {
-        // 実装
+        // Implementation
     }
 
     func handle(_ input: UsersAPI.Create, context: ServiceContext) async throws -> User {
-        // 実装
+        // Implementation
     }
 }
 ```
 
-## 依存関係
+## Dependencies
 
-| パッケージ | 用途 | 必須 |
-|-----------|------|------|
-| [swift-syntax](https://github.com/swiftlang/swift-syntax) | マクロ実装 | ✅ |
+| Package | Purpose | Required |
+|---------|---------|----------|
+| [swift-syntax](https://github.com/swiftlang/swift-syntax) | Macro implementation | ✅ |
 
-## ドキュメント
+## Documentation
 
-詳細なAPIドキュメントは [GitHub Pages](https://no-problem-dev.github.io/swift-api-contract/documentation/apicontract/) で確認できます。
+Detailed API documentation is available at [GitHub Pages](https://no-problem-dev.github.io/swift-api-contract/documentation/apicontract/).
 
-## ライセンス
+## License
 
-MIT License - 詳細は [LICENSE](LICENSE) を参照してください。
+MIT License - See [LICENSE](LICENSE) for details.

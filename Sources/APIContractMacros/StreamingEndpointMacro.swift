@@ -4,8 +4,8 @@ import SwiftSyntaxMacros
 
 /// ストリーミングエンドポイントを定義するマクロ
 ///
-/// structに付与して、`StreamingAPIContract` と `APIInput` への準拠を自動生成します。
-/// 通常の`EndpointMacro`との違いは、`Output`の代わりに`Event`型を使用すること。
+/// struct に付与して `StreamingAPIContract` と `APIInput` への準拠を自動生成する。
+/// `@Endpoint` との違いは `Output` の代わりに `Event` 型を使う点。
 public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
 
     // MARK: - MemberMacro

@@ -8,8 +8,8 @@ Swiftマクロを活用した型安全なAPIコントラクト定義ライブラ
 
 ## Overview
 
-APIContractは、クライアントとサーバー間のAPI定義を共通化し、コンパイル時の型チェックを実現するライブラリです。
-Swiftマクロによる宣言的なAPI定義と、自動コード生成による開発効率の向上を提供します。
+APIContractは、クライアントとサーバー間のAPI定義を共通化し、コンパイル時の型チェックを実現するライブラリ。
+Swiftマクロによる宣言的なAPI定義と、自動コード生成による開発効率向上を提供する。
 
 ### 特徴
 
@@ -24,7 +24,7 @@ Swiftマクロによる宣言的なAPI定義と、自動コード生成による
 ```swift
 import APIContract
 
-@APIGroup(path: "/v1/users", auth: .required)
+@APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     @Endpoint(.get)
     struct List {
@@ -43,7 +43,7 @@ enum UsersAPI {
 ### リクエストの実行
 
 ```swift
-let client: APIExecutor = MyAPIClient(baseURL: "https://api.example.com")
+let client: any APIExecutable = MyAPIClient(baseURL: URL(string: "https://api.example.com")!)
 let endpoint = UsersAPI.Get(userId: "123")
 let user: User = try await endpoint.execute(using: client)
 ```
@@ -60,19 +60,25 @@ let user: User = try await endpoint.execute(using: client)
 - ``APIContract``
 - ``APIInput``
 - ``APIContractGroup``
-- ``APIExecutor``
+- ``APIExecutable``
+- ``StreamingAPIContract``
+- ``StreamingAPIExecutable``
 
 ### マクロ
 
-- ``Endpoint(_:path:)``
-- ``APIGroup(path:auth:)``
+- ``Endpoint(_:path:scopes:)``
+- ``APIGroup(path:auth:headers:scopes:)``
 - ``PathParam()``
-- ``QueryParam(_:)``
+- ``QueryParam(name:)``
 - ``Body()``
+- ``Header(_:)``
+- ``StreamingEndpoint(_:path:scopes:)``
+- ``APIServices()``
 
 ### 型
 
 - ``APIMethod``
-- ``AuthRequirement``
+- ``AuthScheme``
+- ``APIResponse``
 - ``EmptyInput``
 - ``EmptyOutput``

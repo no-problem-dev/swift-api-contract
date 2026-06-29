@@ -2,7 +2,7 @@ import Foundation
 
 /// 認証プロバイダープロトコル
 ///
-/// トークンを検証してユーザーIDを返します。
+/// トークンを検証してユーザーIDを返す。
 public protocol AuthenticationProvider: Sendable {
     func verifyToken(_ token: String) async throws -> String
 }
