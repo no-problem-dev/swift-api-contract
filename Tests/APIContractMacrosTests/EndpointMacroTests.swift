@@ -14,6 +14,7 @@ let testMacros: [String: Macro.Type] = [
     "QueryParam": QueryParamMacro.self,
     "Body": BodyMacro.self,
     "Header": HeaderMacro.self,
+    "APIServices": APIServicesMacro.self,
 ]
 #endif
 
