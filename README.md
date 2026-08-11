@@ -42,7 +42,7 @@ defining endpoints, implementing a client, and serving the same definitions.
 
 ## Requirements
 
-Swift 6.0+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+
+Swift 6.0+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
 
 ## Installation
 

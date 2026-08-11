@@ -41,7 +41,7 @@ let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
 ## 動作環境
 
-Swift 6.0+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+
+Swift 6.0+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
 
 ## インストール
 
