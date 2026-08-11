@@ -1,7 +1,9 @@
 import SwiftSyntax
 
-/// `scopes: ["a", "b"]` のような `[String]` 配列リテラルをパースする。
-/// 文字列リテラル要素のみ対象（補間や変数参照は無視）。
+/// Reads a `[String]` literal such as `scopes: ["a", "b"]`.
+///
+/// Only plain string-literal elements are taken; an interpolated or referenced value is skipped
+/// without a diagnostic, so the scopes end up narrower than the source suggests.
 func parseStringArrayLiteral(from expr: ExprSyntax) -> [String] {
     guard let arrayExpr = expr.as(ArrayExprSyntax.self) else { return [] }
     var result: [String] = []
@@ -14,7 +16,7 @@ func parseStringArrayLiteral(from expr: ExprSyntax) -> [String] {
     return result
 }
 
-/// `[String]` の Swift ソースリテラル表現を生成する（例: `["a", "b"]`）。
+/// Renders a `[String]` back as Swift source, such as `["a", "b"]`, for use in an expansion.
 func stringArraySource(_ scopes: [String]) -> String {
     "[" + scopes.map { "\"\($0)\"" }.joined(separator: ", ") + "]"
 }

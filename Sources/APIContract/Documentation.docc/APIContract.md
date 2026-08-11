@@ -1,6 +1,6 @@
 # ``APIContract``
 
-Swiftマクロを活用した型安全なAPIコントラクト定義ライブラリ。
+Define an HTTP API once in Swift and share it between the client and the server.
 
 @Metadata {
     @PageColor(blue)
@@ -8,77 +8,101 @@ Swiftマクロを活用した型安全なAPIコントラクト定義ライブラ
 
 ## Overview
 
-APIContractは、クライアントとサーバー間のAPI定義を共通化し、コンパイル時の型チェックを実現するライブラリ。
-Swiftマクロによる宣言的なAPI定義と、自動コード生成による開発効率向上を提供する。
+An endpoint is a struct. Its properties are the request, its `Output` is the response, and the
+macros generate what sits between them — URL building, query and body encoding, and the
+server-side decoding that turns a raw request back into the same struct.
 
-### 特徴
+Because both ends compile against the same declaration, a change to a path, a parameter or a
+response type is a compile error on whichever side has not caught up, instead of a bug found at
+runtime.
 
-- **型安全なAPI定義**: コンパイル時にエンドポイントの入出力型をチェック
-- **Swiftマクロ**: `@Endpoint`、`@APIGroup`マクロによる宣言的なAPI定義
-- **自動コード生成**: パスパラメータ、クエリパラメータ、ボディのエンコード処理を自動生成
-- **グループ化**: 関連するエンドポイントを論理的にグループ化
-- **Async/Await対応**: モダンな非同期処理との統合
+Three things are deliberately left out:
 
-### クイックスタート
+- **No transport.** Conform to ``APIExecutable`` with whatever client you already have.
+- **No server framework.** Conform to ``APIRouteRegistrar`` to mount the generated routes.
+- **No fixed JSON coder.** Endpoints depend on ``APIBodyEncoder`` and ``APIBodyDecoder``, so the
+  client picks the implementation.
+
+Once a group is defined, the same declaration drives both sides:
 
 ```swift
-import APIContract
+// Client: build and send a request.
+let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
-@APIGroup(path: "/v1/users", auth: .bearer)
-enum UsersAPI {
-    @Endpoint(.get)
-    struct List {
-        @QueryParam var limit: Int?
-        typealias Output = [User]
-    }
-
-    @Endpoint(.get, path: ":userId")
-    struct Get {
-        @PathParam var userId: String
-        typealias Output = User
+// Server: implement the protocol the group generated, then register every route at once.
+struct UsersService: UsersAPIService {
+    func handle(_ input: UsersAPI.Get, context: ServiceContext) async throws -> User {
+        try await store.user(id: input.userId, requestedBy: context.requireUserId())
     }
 }
+
+UsersAPI.registerAll(registrar)
 ```
 
-### リクエストの実行
-
-```swift
-let client: any APIExecutable = MyAPIClient(baseURL: URL(string: "https://api.example.com")!)
-let endpoint = UsersAPI.Get(userId: "123")
-let user: User = try await endpoint.execute(using: client)
-```
+<doc:GettingStarted> walks through defining a group, implementing a client and serving it.
 
 ## Topics
 
-### はじめに
+### Essentials
 
 - <doc:GettingStarted>
 - <doc:DefiningEndpoints>
 
-### プロトコル
+### Defining an API
 
-- ``APIContract``
-- ``APIInput``
-- ``APIContractGroup``
-- ``APIExecutable``
-- ``StreamingAPIContract``
-- ``StreamingAPIExecutable``
-
-### マクロ
-
-- ``Endpoint(_:path:scopes:)``
 - ``APIGroup(path:auth:headers:scopes:)``
+- ``Endpoint(_:path:scopes:)``
+- ``StreamingEndpoint(_:path:scopes:)``
+
+### Placing values in a request
+
 - ``PathParam()``
 - ``QueryParam(name:)``
 - ``Body()``
 - ``Header(_:)``
-- ``StreamingEndpoint(_:path:scopes:)``
-- ``APIServices()``
 
-### 型
+### Endpoint protocols
+
+- ``APIContract``
+- ``StreamingAPIContract``
+- ``APIInput``
+- ``APIContractGroup``
+- ``EndpointDescriptor``
+- ``NoGroup``
+
+### Calling an API
+
+- ``APIExecutable``
+- ``StreamingAPIExecutable``
+- ``APIResponse``
+
+### Serving an API
+
+- ``APIServices()``
+- ``APIService``
+- ``APIRouteRegistrar``
+- ``StreamingRouteRegistrar``
+- ``ServiceContext``
+- ``AnyEndpointDispatcher``
+- ``AuthenticationProvider``
+
+### Encoding
+
+- ``APIBodyEncoder``
+- ``APIBodyDecoder``
+
+### Requests and responses
 
 - ``APIMethod``
 - ``AuthScheme``
-- ``APIResponse``
 - ``EmptyInput``
 - ``EmptyOutput``
+
+### Errors
+
+- ``APIContractError``
+- ``ErrorResponse``
+- ``HTTPError``
+- ``AuthenticationError``
+- ``ContractBuildError``
+- ``NoContractError``

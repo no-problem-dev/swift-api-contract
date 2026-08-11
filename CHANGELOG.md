@@ -1,197 +1,216 @@
 # Changelog
 
-このプロジェクトのすべての注目すべき変更はこのファイルに記録されます。
+All notable changes to this project are recorded in this file.
 
-フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づいており、
-このプロジェクトは [Semantic Versioning](https://semver.org/lang/ja/) に従います。
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project follows [Semantic Versioning](https://semver.org/).
 
-## [未リリース]
+## [Unreleased]
 
-なし
+## [2.1.3] - 2026-07-19
+
+### Changed
+
+- README is now English primary with a `README.ja.md` translation; `README_EN.md` removed.
+- Expanded doc comments on the macros and the public types, and corrected README claims that had
+  drifted from the actual API.
+- CI builds documentation on macOS with Swift 6.2 and deploys it through GitHub Pages.
+
+### Added
+
+- Expansion tests for `@StreamingEndpoint` and `@APIServices`, including misuse diagnostics.
+
+## [2.1.2] - 2026-06-14
+
+### Fixed
+
+- An endpoint that resolves to an empty path no longer gets a trailing slash appended to the base
+  URL, which some servers answered with a 404.
+
+## [2.1.1] - 2026-06-13
+
+Re-tag of 2.1.0. No source changes.
+
+## [2.1.0] - 2026-06-13
+
+### Added
+
+- `requiredScopes` on endpoints and groups: `@Endpoint(scopes:)` and `@APIGroup(scopes:)` declare
+  the OAuth scopes a call needs, and an endpoint without its own inherits the group's.
+- The same `requiredScopes` on `StreamingAPIContract`.
 
 ## [2.0.1] - 2026-06-08
 
-### 変更
-- swift-syntax の許容範囲を `from: 602.0.0` から `600.0.0..<604.0.0` に緩和。
-  mlx-swift-lm 3.31.3（swift-syntax 600..<601 要求）を含む依存グラフ
-  （swift-llm-local 2.x + swift-llm-cloud）で解決できるようにするため。
-  マクロは swift-syntax 600.0.1 / 603.0.1 の両方でビルド・テスト確認済み
+### Changed
+
+- Widened the accepted swift-syntax range from `from: 602.0.0` to `600.0.0..<604.0.0` so
+  dependency graphs pinning older swift-syntax resolve. The macros are verified against both
+  600.0.1 and 603.0.1.
+
+## [2.0.0] - 2026-05-31
+
+### Changed
+
+- **Breaking.** `encodeBody(using:)`, `decode(...)` and `decodeError(...)` now take
+  `APIBodyEncoder` / `APIBodyDecoder` instead of Foundation's concrete `JSONEncoder` /
+  `JSONDecoder`, so a client can inject its own coder while API definitions stay on `Codable`.
+  Foundation's coders conform to the new protocols, so the default path is unchanged.
+  Hand-written contract implementations must swap the parameter types.
 
 ## [1.2.0] - 2026-04-18
 
-### 追加
+### Added
 
-- **`{key}` プレースホルダー構文サポート**: `resolvePath` が `:key` 形式に加えて `{key}` 形式も substitute 対象にする
-  - Go chi ルーター / OpenAPI 仕様との整合性を確保
-  - 既存の `:key` 定義は引き続き動作（後方互換）
-  - 例: `@Endpoint(.patch, path: "/social-challenges/{id}/status")` が正しく id を展開するようになる
+- **`{key}` placeholder syntax**: `resolvePath` substitutes `{key}` as well as `:key`
+  - Matches what Go's chi router and OpenAPI specs use
+  - Existing `:key` definitions keep working
+  - `@Endpoint(.patch, path: "/social-challenges/{id}/status")` now expands `id` correctly
 
 ## [1.0.7] - 2026-01-11
 
-### 追加
+### Added
 
-- **@StreamingEndpoint マクロ**: SSEストリーミングAPI定義のサポート
-  - `StreamingAPIContract` プロトコル: `Event` 関連型を持つストリーミングレスポンス用
-  - `StreamingAPIExecutable` プロトコル: クライアント側ストリーミング実行
-  - `StreamingRouteRegistrar` プロトコル: サーバー側ルート登録
-  - `@StreamingEndpoint` マクロ: `@Endpoint` の並列版でストリーミングAPI定義
+- **`@StreamingEndpoint` macro**: support for defining SSE streaming APIs
+  - `StreamingAPIContract`: streaming responses, with an `Event` associated type
+  - `StreamingAPIExecutable`: client-side stream execution
+  - `StreamingRouteRegistrar`: server-side route registration
+  - `@StreamingEndpoint`: the streaming counterpart of `@Endpoint`
 
-### 使用例
-
-```swift
-@StreamingEndpoint(.post, path: "stream")
-public struct StartStream {
-    @Body public var request: SearchRequest
-    public typealias Event = SearchEvent  // クライアントにストリームされるイベント型
-}
-```
+  ```swift
+  @StreamingEndpoint(.post, path: "stream")
+  public struct StartStream {
+      @Body public var request: SearchRequest
+      public typealias Event = SearchEvent  // event type streamed to the client
+  }
+  ```
 
 ## [1.0.6] - 2026-01-03
 
-### 修正
+### Fixed
 
-- **resolvePath プロトコル要件化**: ジェネリック呼び出し時のカスタム実装サポート
-  - `resolvePath(with:)` をプロトコル拡張のみからプロトコル要件に変更
-  - ジェネリック制約経由（`E: APIContract`）でもカスタム実装が正しく呼び出されるように修正
-  - デフォルト実装は維持し、後方互換性を確保
+- **`resolvePath` promoted to a protocol requirement**: custom implementations are now reached
+  through a generic constraint (`E: APIContract`), not only on concrete types. The default
+  implementation stays, so existing code is unaffected.
 
-### 追加
+### Added
 
-- **APIContract テスト**: 22個の新規テストを追加
-  - `pathTemplate` テスト
-  - `resolvePath` デフォルト実装テスト
-  - カスタム `resolvePath` テスト（直接呼び出し・ジェネリック呼び出し）
-  - `buildRequest` テスト
-  - `APIMethod`、`AuthRequirement`、`EmptyOutput`、`EmptyInput` テスト
-  - `APIInput`、`APIContractGroup`、`EndpointDescriptor` テスト
+- **APIContract tests**: 22 new tests
+  - `pathTemplate`
+  - default `resolvePath`
+  - custom `resolvePath`, called directly and generically
+  - `buildRequest`
+  - `APIMethod`, `AuthRequirement`, `EmptyOutput`, `EmptyInput`
+  - `APIInput`, `APIContractGroup`, `EndpointDescriptor`
 
 ## [1.0.5] - 2026-01-03
 
-### 変更
+### Changed
 
-- **APIExecutor → APIExecutable リネーム**: ~able命名規則に統一
-  - `APIExecutor` プロトコルを `APIExecutable` に変更
+- **`APIExecutor` renamed to `APIExecutable`**, for consistency with the ~able naming convention.
+- **Code cleanup**: removed redundant MARK comments and verbose documentation, keeping concise
+  doc comments on the public protocols.
 
-### 改善
+### Fixed
 
-- **コードクリーンアップ**: 不要なMARKコメントと冗長なドキュメントを削除
-  - publicプロトコルには簡潔なドキュメントコメントを保持
-
-### 修正
-
-- **テスト修正**: テストの期待値をマクロ出力に合わせて更新
+- **Tests**: updated expectations to match the macro output.
 
 ## [1.0.4] - 2026-01-02
 
-### 変更
+### Changed
 
-- **Swift 6.2 対応**: Swift 6.2 安定版に対応
+- **Swift 6.2 support**
   - `swift-tools-version`: 6.0 → 6.2
   - `swift-syntax`: 600.0.0 → 602.0.0
-  - 依存関係指定を `.upToNextMajor` に統一
+  - dependency requirements unified on `.upToNextMajor`
 
-### 追加
+### Added
 
-- **CI テストワークフロー**: Linux x86_64 でのテストを追加
-  - Linux x86_64 (swift:6.2-bookworm)
+- **CI test workflow**: tests on Linux x86_64 (swift:6.2-bookworm)
 
 ## [1.0.3] - 2026-01-01
 
-### 追加
+### Added
 
-- **@APIServices マクロ**
-  - 複数のAPIサービスを一括登録するマクロ
-  - `registerAll<R: Routes>(_ routes: R)` メソッドを自動生成
+- **`@APIServices` macro**
+  - registers multiple API services in one call
+  - generates `registerAll<R: Routes>(_ routes: R)`
 
-- **APIRouteRegistrar プロトコル**
-  - ルート登録のための型安全な抽象化
+- **`APIRouteRegistrar` protocol**
+  - type-safe abstraction for route registration
 
-### 変更
+### Changed
 
-- **Handler → Service リネーム**
+- **Handler renamed to Service**
   - `APIGroupHandler` → `APIService`
   - `APIRouteRegistrar.Handler` → `APIRouteRegistrar.Service`
-  - `@APIGroup` マクロが生成するプロトコル名を `XxxHandler` → `XxxService` に変更
+  - the protocol `@APIGroup` generates: `XxxHandler` → `XxxService`
 
 ## [1.0.2] - 2026-01-01
 
-### 追加
+### Added
 
-- **サーバーサイドハンドラプロトコル**
-  - `APIGroupHandler`: 型安全なAPIハンドラプロトコル
-  - `AuthenticationProvider`: 認証抽象化プロトコル
-  - `HandlerContext`: 認証済みユーザーコンテキスト
+- **Server-side handler protocols**
+  - `APIGroupHandler`: type-safe API handler protocol
+  - `AuthenticationProvider`: authentication abstraction
+  - `HandlerContext`: authenticated user context
 
-- **エラーハンドリング**
-  - `APIContractError`: 標準化されたエラー型（unauthorized, forbidden, notFound, badRequest, conflict, internalError）
+- **Error handling**
+  - `APIContractError`: standard error type (unauthorized, forbidden, notFound, badRequest, conflict, internalError)
 
-### 変更
+### Changed
 
-- `HTTPMethod` を `APIMethod` にリネーム
-- `@Endpoint` マクロに `authRequirement` パラメータを追加
-- `AuthRequirement` enum を追加（none, required）
+- `HTTPMethod` renamed to `APIMethod`
+- `@Endpoint` gained an `authRequirement` parameter
+- added the `AuthRequirement` enum (none, required)
 
 ## [1.0.1] - 2025-12-31
 
-### 修正
+### Fixed
 
-- **Linux サポート**
-  - `EndpointMacro.swift`: `String.replacingOccurrences` 使用のため `Foundation` をインポート
-  - `APIContract.swift`: `URLRequest` 使用のため `FoundationNetworking` を条件付きインポート
+- **Linux support**
+  - `EndpointMacro.swift`: import `Foundation` for `String.replacingOccurrences`
+  - `APIContract.swift`: conditionally import `FoundationNetworking` for `URLRequest`
 
 ## [1.0.0] - 2025-12-31
 
-### 追加
+### Added
 
-- **コアプロトコル**
-  - `APIContract`: エンドポイント定義のコアプロトコル
-  - `APIInput`: リクエストパラメータ（パス、クエリ、ボディ）の型安全な定義
-  - `APIContractGroup`: 関連エンドポイントのグループ化
-  - `APIExecutor`: API実行のための抽象プロトコル
+- **Core protocols**
+  - `APIContract`: the endpoint definition protocol
+  - `APIInput`: type-safe request parameters (path, query, body)
+  - `APIContractGroup`: grouping of related endpoints
+  - `APIExecutor`: abstraction for executing a call
 
-- **マクロ**
-  - `@Endpoint`: エンドポイント構造体の自動生成マクロ
-  - `@APIGroup`: APIグループenumの自動生成マクロ
-  - `@PathParam`: パスパラメータのマーカーマクロ
-  - `@QueryParam`: クエリパラメータのマーカーマクロ（カスタム名サポート）
-  - `@Body`: リクエストボディのマーカーマクロ
+- **Macros**
+  - `@Endpoint`: generates the endpoint struct's members
+  - `@APIGroup`: generates the API group enum's members
+  - `@PathParam`, `@QueryParam` (with custom names), `@Body`: parameter markers
 
-- **型ユーティリティ**
-  - `EmptyInput`: パラメータなしエンドポイント用
-  - `EmptyOutput`: レスポンスボディなしエンドポイント用
-  - `APIMethod`: GET、POST、PUT、DELETE、PATCH、HEAD、OPTIONS
-  - `AuthRequirement`: none、required
+- **Type utilities**
+  - `EmptyInput`: endpoints without parameters
+  - `EmptyOutput`: endpoints without a response body
+  - `APIMethod`: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+  - `AuthRequirement`: none, required
 
-- **自動コード生成**
-  - `pathParameters`プロパティの自動生成
-  - `queryParameters`プロパティの自動生成
-  - `encodeBody()`メソッドの自動生成
-  - `init()`イニシャライザの自動生成
-  - URLRequest構築の自動化
+- **Generated code**: `pathParameters`, `queryParameters`, `encodeBody()`, `init()`, and
+  URLRequest construction
 
-### CI/CD
+- **CI/CD**: test workflow per PR, automatic release on release-branch merge, DocC deployment to
+  GitHub Pages
 
-- **GitHub Actions**
-  - `tests.yml`: PRごとのテスト自動実行
-  - `auto-release-on-merge.yml`: リリースブランチマージ時の自動リリース
-  - `docc.yml`: DocCドキュメントのGitHub Pagesデプロイ
-- **自動リリースフロー**
-  - CHANGELOGバリデーション
-  - Gitタグ自動作成
-  - GitHub Release自動生成
-  - 次バージョンリリースブランチ自動作成
+- **Documentation**: README (Japanese and English), DocC articles (GettingStarted,
+  DefiningEndpoints), CHANGELOG
 
-### ドキュメント
+- **Tests**: macro expansion tests (EndpointMacroTests)
 
-- README.md（日本語・英語）
-- DocCドキュメント（GettingStarted、DefiningEndpoints）
-- CHANGELOG.md
-
-### テスト
-
-- マクロ展開テスト（EndpointMacroTests）
-
-[未リリース]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.7...HEAD
+[Unreleased]: https://github.com/no-problem-dev/swift-api-contract/compare/2.1.3...HEAD
+[2.1.3]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.1.2...2.1.3
+[2.1.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.1.1...v2.1.2
+[2.1.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.1.0...v2.1.1
+[2.1.0]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.0.1...v2.1.0
+[2.0.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.2.0...v2.0.0
+[1.2.0]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.7...v1.2.0
 [1.0.7]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.4...v1.0.5
@@ -200,17 +219,3 @@ public struct StartStream {
 [1.0.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/no-problem-dev/swift-api-contract/releases/tag/v1.0.0
-
-<!-- Auto-generated on 2025-12-31T03:15:51Z by release workflow -->
-
-<!-- Auto-generated on 2025-12-31T08:03:40Z by release workflow -->
-
-<!-- Auto-generated on 2026-01-01T05:49:57Z by release workflow -->
-
-<!-- Auto-generated on 2026-01-01T12:25:13Z by release workflow -->
-
-<!-- Auto-generated on 2026-01-02T07:35:29Z by release workflow -->
-
-<!-- Auto-generated on 2026-01-03T00:08:06Z by release workflow -->
-
-<!-- Auto-generated on 2026-01-03T01:10:54Z by release workflow -->

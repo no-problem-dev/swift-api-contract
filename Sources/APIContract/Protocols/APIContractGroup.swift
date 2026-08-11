@@ -1,37 +1,40 @@
 import Foundation
 
-/// APIエンドポイントのグループを定義するプロトコル
+/// Everything a set of related endpoints share: where they live, how they authenticate, how they fail.
 ///
-/// `@APIGroup` マクロで定義した enum が自動的に準拠する。
+/// Conformance comes from `@APIGroup` on an enum. The enum is a namespace, never instantiated —
+/// its endpoints are nested types.
 public protocol APIContractGroup: Sendable {
-    /// グループ内全エンドポイントに共通するURLパスプレフィックス（例: `/v1/users`）。
-    /// 各エンドポイントの `subPath` と結合して最終的なリクエストパスになる。
+    /// Path prefix every endpoint in the group hangs off, such as `/v1/users`.
+    ///
+    /// Endpoint sub-paths are appended to it, so moving an API version is a one-line change here.
     static var basePath: String { get }
 
-    /// グループ内全エンドポイントで使用する認証方式。
-    /// `@APIGroup(auth:)` の引数から自動設定され、デフォルトは `.bearer`。
+    /// How requests in this group prove who they are.
+    ///
+    /// Taken from `@APIGroup(auth:)`. Note the default is `.bearer`, not `.none`: a group that
+    /// needs no auth has to say so.
     static var auth: AuthScheme { get }
 
-    /// グループに属する全エンドポイントのメタ情報一覧。
-    /// `@APIGroup` マクロが各 `@Endpoint` を走査して自動生成する。
+    /// Every endpoint in the group, as data rather than as types.
+    ///
+    /// Written by the macro from the `@Endpoint` members. Useful for generating route tables or
+    /// documentation; streaming endpoints are not listed here.
     static var endpoints: [EndpointDescriptor] { get }
 
-    /// グループ内エンドポイントが必要とする OAuth スコープのデフォルト
-    ///
-    /// 各エンドポイントが独自に `requiredScopes` を指定しない場合に継承される。
+    /// Scopes endpoints inherit unless they declare their own.
     static var requiredScopes: [String] { get }
 
-    /// グループ共通ヘッダー
+    /// Headers added to every request in the group, such as an API version pin.
     ///
-    /// グループ内の全エンドポイントに自動的に付与されるHTTPヘッダー。
-    /// 例: APIバージョンヘッダー（`anthropic-version: 2023-06-01`）
+    /// An endpoint's `@Header` with the same key replaces the value from here.
     static var commonHeaders: [String: String] { get }
 
-    /// グループ固有のエラーデコード
+    /// Turns an error response body into a typed error, for APIs that do not use the default shape.
     ///
-    /// プロバイダー固有のエラーレスポンスJSON構造をデコードする。
-    /// レスポンスヘッダーも受け取るため、レート制限情報の抽出等に活用できる。
-    /// `nil` を返した場合、APIClient のデフォルトエラーハンドリングが使用される。
+    /// Headers are passed in as well, so rate-limit metadata can be lifted out of a 429 while it
+    /// is still available. Returning `nil` — the default — hands the response back to the client's
+    /// own error handling, which is the right answer for any status this group does not recognise.
     static func decodeError(statusCode: Int, data: Data, headers: [String: String], decoder: any APIBodyDecoder) -> (any Error)?
 }
 
@@ -45,20 +48,23 @@ extension APIContractGroup {
     }
 }
 
-/// グループに属さないエンドポイント用のデフォルトグループ
+/// The group an endpoint declared outside any `@APIGroup` enum falls back to.
+///
+/// Its base path is empty, so such an endpoint's path is its sub-path alone — worth checking when
+/// a request arrives at the wrong URL.
 public enum NoGroup: APIContractGroup {
     public static let basePath: String = ""
     public static let auth: AuthScheme = .bearer
     public static let endpoints: [EndpointDescriptor] = []
 }
 
-/// エンドポイントのメタ情報
+/// One endpoint reduced to data, for code that has to enumerate an API rather than call it.
 public struct EndpointDescriptor: Sendable {
     public let name: String
     public let method: APIMethod
     public let subPath: String
 
-    /// このエンドポイントが必要とする OAuth スコープ（空ならグループ既定を継承）。
+    /// Scopes recorded for this endpoint. Empty means it inherits the group's, not that it needs none.
     public let requiredScopes: [String]
 
     public var fullPath: String {

@@ -1,16 +1,23 @@
 import Foundation
 
-/// API契約を実行するプロトコル
+/// What a client has to provide for endpoints to become callable.
+///
+/// Only `executeWithResponse(_:)` needs writing — the `execute(_:)` overloads are supplied by an
+/// extension. Implementing it is where transport, retries and error mapping live; this package
+/// deliberately ships no implementation.
 public protocol APIExecutable: Sendable {
-    /// メタデータ付きレスポンスを返す（基本実装）
+    /// Sends the request and returns the decoded output together with the status and headers.
+    ///
+    /// The one member to implement. Return the metadata even when it looks unused: rate-limit
+    /// headers are only reachable through this overload.
     func executeWithResponse<E: APIContract>(_ contract: E) async throws -> APIResponse<E.Output>
         where E.Input == E, E: APIInput
 
-    /// Output のみ返す（コンビニエンス）
+    /// Sends the request and returns only the decoded output, discarding status and headers.
     func execute<E: APIContract>(_ contract: E) async throws -> E.Output
         where E.Input == E, E: APIInput
 
-    /// EmptyOutput 用（コンビニエンス）
+    /// Sends a request whose response carries no body, so there is nothing to return.
     func execute<E: APIContract>(_ contract: E) async throws
         where E.Input == E, E.Output == EmptyOutput, E: APIInput
 }

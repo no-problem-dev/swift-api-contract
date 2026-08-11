@@ -125,7 +125,7 @@ struct NoGroupContract: APIContract, APIInput {
     }
 }
 
-/// ヘッダー付きエンドポイント
+/// Endpoint carrying its own headers, used to check they override the group's.
 struct HeaderContract: APIContract, APIInput {
     typealias Group = APIKeyGroup
     typealias Input = Self
@@ -228,8 +228,8 @@ final class APIContractTests: XCTestCase {
     }
 
     func testResolvePathWithBracePlaceholder() {
-        // サーバー側 (Go chi / OpenAPI) が採用する `{key}` 形式も substitution 対象に含める。
-        // クライアント契約側が `:key` と `{key}` のどちらで書かれても同じ pathParameter を解決できる。
+        // `{key}` is the placeholder syntax Go chi and OpenAPI use, so contracts written against
+        // an existing spec keep that spelling. Both forms have to resolve to the same parameter.
         struct BraceContract: APIContract, APIInput {
             typealias Group = TestGroup
             typealias Input = Self

@@ -2,10 +2,11 @@ import Foundation
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-/// ストリーミングエンドポイントを定義するマクロ
+/// Implements `@StreamingEndpoint`: the same members as `@Endpoint`, but conforming to
+/// `StreamingAPIContract` because the response is an `Event` sequence rather than one `Output`.
 ///
-/// struct に付与して `StreamingAPIContract` と `APIInput` への準拠を自動生成する。
-/// `@Endpoint` との違いは `Output` の代わりに `Event` 型を使う点。
+/// The generation logic is duplicated from `EndpointMacro` rather than shared, so a fix to one
+/// has to be applied to the other.
 public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
 
     // MARK: - MemberMacro
@@ -35,7 +36,7 @@ public struct StreamingEndpointMacro: MemberMacro, ExtensionMacro {
         members.append("public static let method: APIMethod = .\(raw: arguments.method)")
         members.append("public static let subPath: String = \"\(raw: arguments.path)\"")
 
-        // requiredScopes（スコープ指定があるときのみ。未指定ならグループ既定を継承）
+        // Emitted only when scopes were given; otherwise the group's default is inherited.
         if !arguments.scopes.isEmpty {
             members.append("public static let requiredScopes: [String] = \(raw: stringArraySource(arguments.scopes))")
         }

@@ -3,7 +3,11 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// ストリーミングレスポンスを返すAPI契約
+/// An endpoint whose response is a sequence of events rather than a single decoded value.
+///
+/// The counterpart of `APIContract` for Server-Sent Events and similar transports; conformance
+/// comes from `@StreamingEndpoint`. It is a separate protocol rather than a variant because the
+/// response type is `Event` and there is no single output to return.
 public protocol StreamingAPIContract: Sendable {
     associatedtype Group: APIContractGroup = NoGroup
     associatedtype Input: APIInput = EmptyInput
@@ -14,10 +18,10 @@ public protocol StreamingAPIContract: Sendable {
     static var subPath: String { get }
     static var auth: AuthScheme { get }
 
-    /// このストリーミングエンドポイントが必要とする OAuth スコープ（未指定ならグループ既定を継承）。
+    /// Scopes a token must carry for this stream to open. Empty inherits the group's.
     static var requiredScopes: [String] { get }
 
-    /// エンドポイント固有のHTTPヘッダー
+    /// Per-call headers, applied after the group's common headers and overriding them on a shared key.
     var additionalHeaders: [String: String] { get }
 
     static func resolvePath(with input: Input) -> String
@@ -53,6 +57,15 @@ extension StreamingAPIContract {
 // MARK: - Request Building
 
 extension StreamingAPIContract where Input == Self, Self: APIInput {
+    /// Assembles the `URLRequest` for the stream, including the Server-Sent Events headers.
+    ///
+    /// Same as the non-streaming version except for those headers, which are set before the
+    /// group's, so a group that pins its own `Accept` wins.
+    ///
+    /// - Parameters:
+    ///   - baseURL: Root the path is appended to.
+    ///   - encoder: Encoder for the request body, defaulting to JSON with ISO8601 dates.
+    /// - Throws: `ContractBuildError.invalidURL` when the resolved path cannot form a URL.
     public func buildRequest(
         baseURL: URL,
         encoder: any APIBodyEncoder = JSONEncoder.apiDefault
@@ -77,7 +90,6 @@ extension StreamingAPIContract where Input == Self, Self: APIInput {
         request.httpMethod = Self.method.rawValue
         request.httpBody = try encodeBody(using: encoder)
 
-        // SSE用のヘッダー
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
@@ -85,12 +97,11 @@ extension StreamingAPIContract where Input == Self, Self: APIInput {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        // グループ共通ヘッダー適用
         for (key, value) in Group.commonHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        // エンドポイント固有ヘッダー適用
+        // Applied last, so an endpoint header overrides a group header on the same key.
         for (key, value) in additionalHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
@@ -101,6 +112,10 @@ extension StreamingAPIContract where Input == Self, Self: APIInput {
 
 // MARK: - Streaming Execution
 
+/// What a client provides so streaming endpoints become callable.
+///
+/// The streaming counterpart of `APIExecutable`. Note it does not throw up front: a failure to
+/// open the stream surfaces when the returned sequence is first iterated.
 public protocol StreamingAPIExecutable: Sendable {
     func execute<E: StreamingAPIContract>(
         _ contract: E
@@ -111,6 +126,9 @@ public protocol StreamingAPIExecutable: Sendable {
 // MARK: - Convenience Execution
 
 extension StreamingAPIContract where Input == Self, Self: APIInput {
+    /// Opens the stream, so a call reads from the endpoint value rather than from the client.
+    ///
+    /// Nothing is sent until iteration begins; abandoning the sequence cancels the request.
     public func stream<Executor: StreamingAPIExecutable>(
         using executor: Executor
     ) -> AsyncThrowingStream<Event, Error> {

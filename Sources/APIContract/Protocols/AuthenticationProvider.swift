@@ -1,13 +1,14 @@
 import Foundation
 
-/// 認証プロバイダープロトコル
+/// Turns a bearer token into the user id a `ServiceContext` carries.
 ///
-/// トークンを検証してユーザーIDを返す。
+/// The server side of authentication reduced to its one decision. Throw `AuthenticationError`
+/// rather than returning a sentinel id, so a rejected token cannot be mistaken for a valid one.
 public protocol AuthenticationProvider: Sendable {
     func verifyToken(_ token: String) async throws -> String
 }
 
-/// 認証エラー
+/// Why a token was refused. Every case is a 401 — the distinction is for the logs, not the status line.
 public enum AuthenticationError: APIContractError {
     case invalidToken(String)
     case missingToken

@@ -1,6 +1,6 @@
-# エンドポイントの定義
+# Defining Endpoints
 
-APIContractでエンドポイントを定義する詳細なガイド。
+Every attribute, what it generates, and where each one stops working.
 
 @Metadata {
     @PageColor(blue)
@@ -8,59 +8,66 @@ APIContractでエンドポイントを定義する詳細なガイド。
 
 ## Overview
 
-APIContractの各マクロの詳細な使い方と、様々なパターンのエンドポイント定義を解説する。
+An endpoint declaration is read at compile time, so what you write in the attributes is what the
+macro can see. That is worth holding onto while reading this page: several of the limits below
+follow from it, and none of them are diagnosed.
 
-## @Endpointマクロ
+## The @Endpoint macro
 
-`@Endpoint`マクロは、構造体をAPIエンドポイントに変換する。
-
-### 基本構文
+`@Endpoint` turns a struct into one endpoint.
 
 ```swift
 @Endpoint(.httpMethod, path: "optional/sub/path")
 struct EndpointName {
-    // パラメータ定義
+    // parameter properties
     typealias Output = ResponseType
 }
 ```
 
-### HTTPメソッド
+The struct becomes both the request description and the request value: calling
+`GetUser(userId: "123")` produces something that knows its own method, path, query and body.
 
-サポートされるHTTPメソッド：
+### HTTP methods
 
-| メソッド | 用途 |
+| Method | Use |
 |---------|------|
-| `.get` | リソースの取得 |
-| `.post` | リソースの作成 |
-| `.put` | リソースの完全更新 |
-| `.patch` | リソースの部分更新 |
-| `.delete` | リソースの削除 |
-| `.head` | ヘッダーのみ取得 |
-| `.options` | 許可メソッドの確認 |
+| `.get` | Retrieve a resource |
+| `.post` | Create a resource |
+| `.put` | Replace a resource |
+| `.patch` | Update part of a resource |
+| `.delete` | Delete a resource |
+| `.head` | Retrieve headers only |
+| `.options` | Ask which methods are allowed |
 
-### パス指定
+### Paths
 
-`path` は省略可能。省略した場合はグループのベースパスのみ使われる。
+`path` is optional. Left out, the endpoint sits at the group's base path.
 
 ```swift
-// パスなし → グループのベースパスのみ
+// No sub-path: the group's base path
 @Endpoint(.get)
-struct List { ... }
+struct List { … }
 
-// パスあり → グループのベースパス + サブパス
+// One placeholder
 @Endpoint(.get, path: ":id")
-struct Get { ... }
+struct Get { … }
 
-// 複雑なパス
+// Several, at any depth
 @Endpoint(.get, path: ":userId/posts/:postId/comments")
-struct GetComments { ... }
+struct GetComments { … }
 ```
 
-## パラメータマクロ
+Placeholders can be written `:name` or `{name}`. Both resolve the same way, so a contract
+transcribed from an OpenAPI spec or a chi router can keep the spelling it came with.
+
+The name has to match the property name exactly. A mismatch is not an error: the placeholder
+survives into the URL and the request goes out with `:userId` still in the path.
+
+## Parameter attributes
 
 ### @PathParam
 
-URLパス内のプレースホルダーに対応するパラメータを定義する。
+Fills a placeholder in the path.
 
 ```swift
 @Endpoint(.get, path: ":userId/posts/:postId")
@@ -71,31 +78,36 @@ struct GetPost {
     typealias Output = Post
 }
 
-// 生成されるパス: /123/posts/456
+// Resolves to /123/posts/456
 let endpoint = GetPost(userId: "123", postId: "456")
 ```
 
 ### @QueryParam
 
-URLクエリパラメータを定義する。
+Sends the value as a URL query item. This is also what an unmarked property becomes, so writing
+the attribute changes nothing except how the declaration reads.
 
 ```swift
 @Endpoint(.get)
 struct SearchUsers {
-    @QueryParam var query: String              // 必須
-    @QueryParam var limit: Int?               // オプション
-    @QueryParam(name: "page_size") var pageSize: Int?  // カスタム名
+    @QueryParam var query: String                      // always sent
+    @QueryParam var limit: Int?                        // dropped when nil
+    @QueryParam(name: "page_size") var pageSize: Int?  // different key on the wire
 
     typealias Output = [User]
 }
 
-// 生成されるクエリ: ?query=john&limit=10&page_size=20
+// ?query=john&limit=10&page_size=20
 let endpoint = SearchUsers(query: "john", limit: 10, pageSize: 20)
 ```
 
+Optionality is how an omitted filter is expressed: a `nil` optional is left out of the URL
+entirely, rather than sent as an empty value.
+
 ### @Body
 
-リクエストボディを定義する。`Encodable` に準拠した型を使う。
+Sends the value as the request body. The type has to be `Encodable`; the encoder is whichever one
+the client injects, and `Content-Type: application/json` is set whenever a body is present.
 
 ```swift
 struct CreateUserRequest: Codable {
@@ -109,23 +121,40 @@ struct CreateUser {
 
     typealias Output = User
 }
-
-// リクエストボディがJSON形式でエンコードされる
-let endpoint = CreateUser(body: CreateUserRequest(name: "田中", email: "tanaka@example.com"))
 ```
 
-## 型サポート
+Only one body per endpoint is meaningful. A second `@Body` property is not diagnosed — it is
+silently left out of the request.
 
-### パラメータで使用可能な型
+### @Header
 
-以下の型がパスパラメータとクエリパラメータで使用できる：
+Sends the value as an HTTP header, for the headers that differ between calls to the same endpoint.
+Constant ones belong on the group instead.
 
-- **文字列**: `String`
-- **整数**: `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`
-- **浮動小数点**: `Double`, `Float`
-- **真偽値**: `Bool`
-- **日付**: `Date`（ISO8601形式で自動変換）
-- **Enum**: `RawRepresentable`な型
+```swift
+@Endpoint(.post)
+struct CreateMessage {
+    @Header("anthropic-beta") var beta: String?
+    @Body var request: MessageRequest
+
+    typealias Output = MessageResponse
+}
+```
+
+Two things follow from a header being a header. It is applied after the group's common headers, so
+it wins on a shared key. And it is left out of the server-side decoding, because on that side
+headers come from the transport rather than from the reconstructed input.
+
+## Parameter types
+
+Path and query parameters are converted to strings by type:
+
+- **Strings**: `String`
+- **Integers**: `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `UInt`, `UInt8`, `UInt16`, `UInt32`, `UInt64`
+- **Floating point**: `Double`, `Float`
+- **Booleans**: `Bool`
+- **Dates**: `Date`, as ISO8601 including the time
+- **Enums**: anything `RawRepresentable`, via `.rawValue`
 
 ```swift
 enum Status: String {
@@ -141,11 +170,18 @@ struct FilterUsers {
 }
 ```
 
-### 特殊な型
+The enum case is the fallback, not a listed type: any type not named above is assumed to be
+`RawRepresentable`. When it is not, the error surfaces as a compile failure inside the generated
+code rather than as a diagnostic on your declaration.
 
-#### EmptyInput
+Server-side decoding reverses this, but covers a narrower set: `Int`, `Int64`, `Int32`, `Double`,
+`Float`, `Bool`, `Date` and `RawRepresentable`. The narrower integer widths — `Int16`, `Int8` and
+the unsigned types — encode fine on the client, but fall into the `RawRepresentable` branch when
+decoding, which does not compile. Use `Int` for a parameter an endpoint has to decode.
 
-パラメータなしのエンドポイントに使う。
+### EmptyInput and EmptyOutput
+
+`EmptyInput` is the default input, so an endpoint with no parameters says nothing at all:
 
 ```swift
 @Endpoint(.get)
@@ -154,9 +190,8 @@ struct GetServerStatus {
 }
 ```
 
-#### EmptyOutput
-
-レスポンスボディがないエンドポイント（DELETEなど）に使う。
+`EmptyOutput` is for a response with no body, such as a delete. It also selects the `execute`
+overload that returns nothing, so the call site has no value to discard:
 
 ```swift
 @Endpoint(.delete, path: ":id")
@@ -166,56 +201,87 @@ struct DeleteUser {
 }
 ```
 
-## @APIGroupマクロ
+## The @APIGroup macro
 
-関連するエンドポイントをグループ化し、共通のベースパスと認証設定を定義する。
-
-### 基本構文
+`@APIGroup` collects related endpoints and holds what they share.
 
 ```swift
 @APIGroup(path: "/v1/resource", auth: .bearer)
 enum ResourceAPI {
-    // エンドポイント定義
+    // endpoints
 }
 ```
 
-### 認証方式（AuthScheme）
+The enum is a namespace and is never instantiated. Membership is lexical: an endpoint belongs to
+the group it is written inside. One declared outside any group falls back to ``NoGroup``, whose
+base path is empty — which is the first thing to check when a request arrives at the wrong URL.
 
-| 値 | 説明 |
+### Auth schemes
+
+| Value | Meaning |
 |----|------|
-| `.none` | 認証不要 |
-| `.bearer` | Bearer トークン（Authorization: Bearer \<token\>） |
-| `.apiKey(headerName:)` | API Key ヘッダー（例: x-api-key） |
-| `.queryParam(name:)` | クエリパラメータ（例: ?key=...） |
+| `.none` | No credential |
+| `.bearer` | `Authorization: Bearer <token>` |
+| `.apiKey(headerName:)` | A dedicated header, such as `x-api-key` |
+| `.queryParam(name:)` | In the URL, such as `?key=…` |
 
-### グループ化の例
+The default is `.bearer`, so a public group has to say `.none` explicitly. The scheme only
+declares where a credential goes; obtaining and attaching it is the client's job.
+
+### Common headers and scopes
 
 ```swift
-// ユーザーAPI
-@APIGroup(path: "/v1/users", auth: .bearer)
-enum UsersAPI {
-    @Endpoint(.get) struct List { ... }
-    @Endpoint(.get, path: ":id") struct Get { ... }
-    @Endpoint(.post) struct Create { ... }
-    @Endpoint(.put, path: ":id") struct Update { ... }
-    @Endpoint(.delete, path: ":id") struct Delete { ... }
-}
-
-// 認証API（認証不要）
-@APIGroup(path: "/v1/auth", auth: .none)
-enum AuthAPI {
-    @Endpoint(.post, path: "login") struct Login { ... }
-    @Endpoint(.post, path: "register") struct Register { ... }
-    @Endpoint(.post, path: "refresh") struct Refresh { ... }
+@APIGroup(
+    path: "/v1/messages",
+    auth: .bearer,
+    headers: ["anthropic-version": "2023-06-01"],
+    scopes: ["messages:read"]
+)
+enum MessagesAPI {
+    @Endpoint(.post, scopes: ["messages:write"])
+    struct Create {
+        @Body var body: CreateMessageRequest
+        typealias Output = Message
+    }
 }
 ```
 
-## 完全な例
+`headers` is applied to every request in the group. `scopes` is inherited by endpoints that do not
+declare their own — `Create` above needs `messages:write` only, not both.
+
+Both are read from the source text, so they have to be written as literals. A dictionary or array
+built elsewhere is read as empty, without a diagnostic, and the endpoints end up with no common
+headers or no scopes at all.
+
+## Streaming endpoints
+
+`@StreamingEndpoint` is the same declaration with a sequence of events in place of a single
+response. Name the event type `Event` rather than `Output`.
+
+```swift
+@StreamingEndpoint(.post, path: "messages")
+struct StreamMessages {
+    @Body var request: MessageRequest
+    typealias Event = MessageDelta
+}
+
+for try await delta in StreamMessages(request: request).stream(using: client) {
+    print(delta)
+}
+```
+
+Building the request adds the Server-Sent Events headers (`Accept: text/event-stream` and
+`Cache-Control: no-cache`) before the group's, so a group pinning its own `Accept` wins.
+
+Streaming endpoints are not collected by their group: they do not appear in `endpoints`, and
+`registerAll(_:)` does not register them. Mount them individually through
+``StreamingRouteRegistrar``.
+
+## A complete group
 
 ```swift
 import APIContract
 
-// モデル定義
 struct User: Codable {
     let id: String
     let name: String
@@ -232,7 +298,6 @@ struct UpdateUserRequest: Codable {
     let email: String?
 }
 
-// API定義
 @APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     @Endpoint(.get)

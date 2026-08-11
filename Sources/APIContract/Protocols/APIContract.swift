@@ -3,7 +3,14 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// API契約を定義するプロトコル
+/// One request/response endpoint, described once and shared by the client and the server.
+///
+/// Conformance is written by `@Endpoint` rather than by hand: the macro fills in the associated
+/// types and the request-building members. Conforming manually is possible but means reproducing
+/// everything the macro generates.
+///
+/// The associated types have defaults, so an endpoint only states what differs from them — an
+/// endpoint outside a group keeps `NoGroup`, one without parameters keeps `EmptyInput`.
 public protocol APIContract: Sendable {
     associatedtype Group: APIContractGroup = NoGroup
     associatedtype Input: APIInput = EmptyInput
@@ -14,35 +21,39 @@ public protocol APIContract: Sendable {
     static var subPath: String { get }
     static var auth: AuthScheme { get }
 
-    /// このエンドポイントが必要とする OAuth スコープ
+    /// OAuth scopes a token must carry for this endpoint to be callable.
     ///
-    /// `@Endpoint(..., scopes:)` で指定したスコープ。未指定なら所属グループの
-    /// `requiredScopes` を継承する。スコープ対応のトークンプロバイダ
-    /// (`ScopedAuthTokenProvider`) を使う APIClient が、トークン取得時にこの値を渡す。
+    /// Set from `@Endpoint(scopes:)`, or inherited from the group when that argument is left out.
+    /// A scope-aware client passes this on when it acquires a token, so an endpoint that
+    /// under-declares its scopes fails at the API rather than at compile time.
     static var requiredScopes: [String] { get }
 
-    /// エンドポイント固有のHTTPヘッダー
+    /// Headers that vary per call, added on top of the group's common headers.
     ///
-    /// リクエストごとに動的に付与するヘッダー。
-    /// 例: `anthropic-beta: structured-outputs-2025-11-13`（条件付き）
+    /// Generated from the endpoint's `@Header` properties. These are applied last, so a key
+    /// declared here replaces the group's value for the same key.
     var additionalHeaders: [String: String] { get }
 
-    /// 入力からパスを解決する
+    /// Builds the request path for a given input.
     ///
-    /// デフォルト実装は`pathTemplate`のパスパラメータを置換する。
-    /// カスタム実装でオーバーライド可能。
+    /// The default substitutes path parameters into the template, which covers every endpoint the
+    /// macro generates. Implement it only for a path the placeholder syntax cannot express; it is
+    /// a protocol requirement rather than an extension member so that generic call sites reach the
+    /// custom version.
     static func resolvePath(with input: Input) -> String
 }
 
 extension APIContract {
     public static var auth: AuthScheme { Group.auth }
 
-    /// デフォルトはグループの `requiredScopes` を継承する。
+    /// Inherits the group's scopes when the endpoint does not declare its own.
     public static var requiredScopes: [String] { Group.requiredScopes }
 
     public var additionalHeaders: [String: String] { [:] }
 
-    /// グループの `basePath` とエンドポイントの `subPath` を結合した完全パステンプレート
+    /// The group's base path joined with this endpoint's sub-path, placeholders still unsubstituted.
+    ///
+    /// Either half may be empty, and the join never doubles or drops the separator between them.
     public static var pathTemplate: String {
         let base = Group.basePath
         if subPath.isEmpty { return base }
@@ -62,21 +73,24 @@ extension APIContract {
 }
 
 extension APIContract where Input == Self, Self: APIInput {
-    /// エンドポイントの定義から `URLRequest` を構築する
+    /// Assembles the `URLRequest` this endpoint describes: path, query, body and headers.
     ///
-    /// パスパラメータの置換、クエリパラメータの付与、ボディのエンコード、
-    /// グループ共通ヘッダーとエンドポイント固有ヘッダーを適用する。
+    /// Everything an endpoint declares is applied here, in one place, so a client only has to
+    /// send the result. `Content-Type: application/json` is set whenever a body was produced,
+    /// independently of which encoder produced it.
     ///
     /// - Parameters:
-    ///   - baseURL: API のベース URL
-    ///   - encoder: ボディのエンコードに使用するエンコーダ。デフォルトは ISO8601 日付形式の `JSONEncoder`
-    /// - Throws: `ContractBuildError.invalidURL` パスが無効な URL を形成する場合
+    ///   - baseURL: Root the path is appended to. Pass the host, not a URL already carrying the path.
+    ///   - encoder: Encoder for the request body. The default encodes dates as ISO8601, which is
+    ///              what the server-side decoding in this package expects.
+    /// - Throws: `ContractBuildError.invalidURL` when the resolved path cannot form a URL —
+    ///           most often an unsubstituted placeholder or a raw character in a parameter value.
     public func buildRequest(
         baseURL: URL,
         encoder: any APIBodyEncoder = JSONEncoder.apiDefault
     ) throws -> URLRequest {
         let path = Self.resolvePath(with: self)
-        // 空パス時の末尾スラッシュ付与を回避(APIClientImpl と同じ理由)。
+        // appendingPathComponent("") still appends a trailing slash, which some servers 404 on.
         let requestURL = path.isEmpty ? baseURL : baseURL.appendingPathComponent(path)
         guard var urlComponents = URLComponents(
             url: requestURL,
@@ -101,12 +115,11 @@ extension APIContract where Input == Self, Self: APIInput {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        // グループ共通ヘッダー適用
         for (key, value) in Group.commonHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        // エンドポイント固有ヘッダー適用（グループヘッダーより優先）
+        // Applied after the group's, so an endpoint header overrides a group header on the same key.
         for (key, value) in additionalHeaders {
             request.setValue(value, forHTTPHeaderField: key)
         }
@@ -128,7 +141,10 @@ extension APIContract where Input == Self, Self: APIInput, Output == EmptyOutput
 }
 
 extension JSONEncoder {
-    /// ISO8601 日付形式を使用するデフォルト設定の `JSONEncoder`
+    /// The encoder `buildRequest` uses when the caller does not supply one: JSON with ISO8601 dates.
+    ///
+    /// It matches the date format the generated server-side decoding parses, so replacing it means
+    /// changing both ends.
     public static var apiDefault: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -136,9 +152,9 @@ extension JSONEncoder {
     }
 }
 
-/// `buildRequest` が無効な URL を構築しようとしたときに throw されるエラー
+/// A request could not be built, which is a mistake in the endpoint definition rather than a network failure.
 public enum ContractBuildError: Error, LocalizedError {
-    /// 指定されたパスが有効な URL を形成しない
+    /// The resolved path does not form a URL — typically a placeholder that was never substituted.
     case invalidURL(path: String)
 
     public var errorDescription: String? {

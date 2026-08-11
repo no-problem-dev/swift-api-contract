@@ -1,9 +1,9 @@
 import Foundation
 
-/// レスポンスメタデータ付きのAPI応答
+/// A decoded response with the status and headers still attached.
 ///
-/// `executeWithResponse()` で使用し、レスポンスヘッダーやステータスコードへのアクセスを提供する。
-/// レート制限情報の抽出など、メタデータが必要なユースケースに対応。
+/// What `executeWithResponse(_:)` returns. Reach for it when the body alone is not enough —
+/// rate-limit budgets, pagination cursors and ETags all live in the headers.
 public struct APIResponse<Output: Sendable>: Sendable {
     public let output: Output
     public let statusCode: Int
@@ -15,7 +15,10 @@ public struct APIResponse<Output: Sendable>: Sendable {
         self.headers = headers
     }
 
-    /// 指定名のヘッダー値を取得（大文字小文字を区別しない）
+    /// Looks up a header without caring about capitalisation, which servers are inconsistent about.
+    ///
+    /// Subscripting `headers` directly is the reason `x-ratelimit-remaining` sometimes reads as
+    /// absent; use this instead.
     public func header(_ name: String) -> String? {
         let lowered = name.lowercased()
         return headers.first { $0.key.lowercased() == lowered }?.value

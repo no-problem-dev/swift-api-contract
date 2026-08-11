@@ -1,7 +1,8 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-/// APIグループを定義するマクロ
+/// Implements `@APIGroup`: group configuration and `registerAll` as members, `APIContractGroup`
+/// conformance as an extension, and a `<EnumName>Service` protocol as a peer.
 public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
 
     // MARK: - MemberMacro
@@ -37,7 +38,7 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
             members.append(DeclSyntax(stringLiteral: "public static let commonHeaders: [String: String] = [\(headerEntries)]"))
         }
 
-        // static let requiredScopes: [String]（グループ既定）
+        // Group-level default; endpoints without their own scopes inherit it.
         members.append(DeclSyntax(stringLiteral: "public static let requiredScopes: [String] = \(stringArraySource(arguments.scopes))"))
 
         // static let endpoints: [EndpointDescriptor]
@@ -111,7 +112,8 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
                     path = segment.content.text
                 }
             case "auth":
-                // AuthScheme の式をそのまま文字列として保持
+                // Kept as source text rather than parsed: the expression is re-emitted verbatim,
+                // so any spelling that type-checks in the caller's context keeps working.
                 authExpression = argument.expression.trimmedDescription
             case "headers":
                 headers = parseDictionaryLiteral(from: argument.expression)
@@ -125,7 +127,7 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         return APIGroupArguments(path: path, authExpression: authExpression, headers: headers, scopes: scopes)
     }
 
-    /// [String: String] リテラルをパース
+    /// Reads a `[String: String]` literal. Non-literal keys or values are dropped silently.
     private static func parseDictionaryLiteral(from expr: ExprSyntax) -> [(String, String)] {
         guard let dictExpr = expr.as(DictionaryExprSyntax.self) else {
             return []
@@ -147,7 +149,9 @@ public struct APIGroupMacro: MemberMacro, ExtensionMacro, PeerMacro {
         return result
     }
 
-    /// enum内の@Endpoint付きstructを収集
+    /// Collects the `@Endpoint` structs written directly in the enum body.
+    ///
+    /// Matches on the attribute name alone, so `@StreamingEndpoint` members are not collected.
     private static func collectEndpoints(from enumDecl: EnumDeclSyntax) -> [EndpointInfo] {
         var endpoints: [EndpointInfo] = []
 

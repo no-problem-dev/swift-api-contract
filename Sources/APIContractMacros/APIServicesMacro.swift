@@ -1,10 +1,11 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-/// 複数のAPIサービスをグループ化するマクロ
+/// Implements `@APIServices`: generates a `registerAll` that mounts each stored service and
+/// registers its group's endpoints.
 ///
-/// struct に付与して `registerAll` メソッドを自動生成する。
-/// 各プロパティ型の `Service.Group.registerAll()` を呼び出すコードを生成する。
+/// The emitted body references `Routes` and `mount(_:)`, which this package does not define —
+/// they have to exist in the server module that applies the macro.
 public struct APIServicesMacro: MemberMacro {
 
     public static func expansion(
@@ -13,25 +14,24 @@ public struct APIServicesMacro: MemberMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // structにのみ適用可能
         guard let structDecl = declaration.as(StructDeclSyntax.self) else {
             throw APIServicesMacroError.onlyApplicableToStruct
         }
 
-        // stored propertiesを収集
         let properties = collectStoredProperties(from: structDecl)
 
         if properties.isEmpty {
             throw APIServicesMacroError.noPropertiesFound
         }
 
-        // registerAllメソッドを生成
         return [generateRegisterAllMethod(properties: properties)]
     }
 
     // MARK: - Private Helpers
 
-    /// stored propertiesを収集
+    /// Collects the struct's stored properties, each of which is taken to be a service.
+    ///
+    /// A property without a type annotation is skipped, so its service never gets registered.
     private static func collectStoredProperties(from structDecl: StructDeclSyntax) -> [ServicePropertyInfo] {
         var properties: [ServicePropertyInfo] = []
 
@@ -40,14 +40,13 @@ public struct APIServicesMacro: MemberMacro {
                 continue
             }
 
-            // let または var で宣言されたstored propertyのみ対象
             for binding in varDecl.bindings {
                 guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
                       let typeAnnotation = binding.typeAnnotation else {
                     continue
                 }
 
-                // computed propertyは除外（accessorがあればcomputed）
+                // An accessor block means it is computed, so there is no service to mount.
                 if binding.accessorBlock != nil {
                     continue
                 }
@@ -62,7 +61,7 @@ public struct APIServicesMacro: MemberMacro {
         return properties
     }
 
-    /// registerAllメソッドを生成
+    /// Emits `registerAll`, one mount-and-register line per service.
     private static func generateRegisterAllMethod(properties: [ServicePropertyInfo]) -> DeclSyntax {
         let registrations = properties.map { property in
             "\(property.typeName).Group.registerAll(routes.mount(\(property.name)))"

@@ -1,22 +1,18 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-/// HTTPヘッダーをマークするマクロ
-///
-/// `@Endpoint` マクロがプロパティを HTTPヘッダーとして認識するためのマーカー。
-/// 単体では何も生成しない。
+/// Implements `@Header`. A marker only: `@Endpoint` reads the attribute, including its header
+/// name argument, and generates everything, so this expansion produces nothing.
 public struct HeaderMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingPeersOf declaration: some DeclSyntaxProtocol,
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // プロパティにのみ適用可能
         guard declaration.is(VariableDeclSyntax.self) else {
             throw HeaderMacroError.onlyApplicableToProperty
         }
 
-        // マーカーマクロなので何も生成しない
         return []
     }
 }

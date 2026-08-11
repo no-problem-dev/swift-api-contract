@@ -2,9 +2,7 @@ import Foundation
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-/// エンドポイントを定義するマクロ
-///
-/// struct に付与して `APIContract` と `APIInput` への準拠を自動生成する。
+/// Implements `@Endpoint`: request-building members plus the `APIContract` / `APIInput` conformance.
 public struct EndpointMacro: MemberMacro, ExtensionMacro {
 
     // MARK: - MemberMacro
@@ -15,18 +13,15 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [DeclSyntax] {
-        // structにのみ適用可能
         guard let structDecl = declaration.as(StructDeclSyntax.self) else {
             throw EndpointMacroError.onlyApplicableToStruct
         }
 
-        // マクロ引数を解析
         let arguments = try parseArguments(from: node)
 
-        // プロパティ情報を収集
         let properties = try collectProperties(from: structDecl)
 
-        // 親enumを検出してGroupとして使用
+        // The enclosing @APIGroup enum, if any, becomes the endpoint's Group.
         let parentEnumName = findParentEnumName(in: context)
 
         var members: [DeclSyntax] = []
@@ -34,7 +29,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         // typealias Input = Self
         members.append("public typealias Input = Self")
 
-        // typealias Group = ParentEnumName (親enumが見つかった場合のみ)
+        // Left out entirely when there is no enclosing enum, so Group falls back to NoGroup.
         if let groupName = parentEnumName {
             members.append("public typealias Group = \(raw: groupName)")
         }
@@ -45,8 +40,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         // static let subPath: String
         members.append("public static let subPath: String = \"\(raw: arguments.path)\"")
 
-        // static let requiredScopes: [String] （スコープ指定があるときのみ。
-        // 未指定ならプロトコル拡張のデフォルト = Group.requiredScopes を継承）
+        // Emitted only when scopes were given; otherwise the protocol extension's default
+        // applies, which inherits Group.requiredScopes.
         if !arguments.scopes.isEmpty {
             members.append("public static let requiredScopes: [String] = \(raw: stringArraySource(arguments.scopes))")
         }
@@ -74,10 +69,10 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         let bodyProperty = properties.first { $0.kind == .body }
         members.append(generateEncodeBodyMethod(for: bodyProperty))
 
-        // init (ヘッダープロパティを除いた入力パラメータのみ含める)
         members.append(generateInitializer(for: properties))
 
-        // static func decode(...) - サーバーサイドデコーディング
+        // Headers are excluded: on the server they come from the transport, not the request body
+        // or URL, so there is nothing to decode them from.
         let nonHeaderProperties = properties.filter { $0.kind != .header }
         members.append(generateDecodeMethod(for: nonHeaderProperties))
 
@@ -93,7 +88,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-        // structでない場合は空の配列を返す（エラーはMemberMacroで報告済み）
+        // Stay quiet for non-structs: the member expansion already threw for this case, and
+        // reporting twice would put the same error on the declaration twice.
         guard declaration.is(StructDeclSyntax.self) else {
             return []
         }
@@ -111,10 +107,12 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
 
     // MARK: - Private Helpers
 
-    /// レキシカルコンテキストから親enumの名前を検出
+    /// Finds the enclosing enum's name by walking outwards through the lexical context.
+    ///
+    /// Nesting is what associates an endpoint with its group; there is no explicit argument for it.
+    /// The innermost enum wins, and the enum is not checked for `@APIGroup`.
     private static func findParentEnumName(in context: some MacroExpansionContext) -> String? {
         for lexicalContext in context.lexicalContext {
-            // enumを探す
             if let enumDecl = lexicalContext.as(EnumDeclSyntax.self) {
                 return enumDecl.name.text
             }
@@ -133,7 +131,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
 
         for argument in arguments {
             if argument.label == nil {
-                // 最初の引数（method）
+                // The unlabelled argument is the method. Only a member access such as `.get` is
+                // recognised; anything else leaves the default in place.
                 if let memberAccess = argument.expression.as(MemberAccessExprSyntax.self) {
                     method = memberAccess.declName.baseName.text
                 }
@@ -161,7 +160,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
                 continue
             }
 
-            // typealiasは除外
+            // Guard against a property that shadows the associated-type names.
             if pattern.identifier.text == "Output" || pattern.identifier.text == "Input" {
                 continue
             }
@@ -209,7 +208,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             }
         }
 
-        // デフォルトはクエリパラメータ
+        // An unmarked property is sent as a query parameter.
         return .queryParam
     }
 
@@ -234,7 +233,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         return nil
     }
 
-    /// @Header("custom-name") からヘッダー名を抽出
+    /// Reads the field name out of `@Header("custom-name")`, or nil when none was given.
     private static func extractHeaderName(from varDecl: VariableDeclSyntax) -> String? {
         for attribute in varDecl.attributes {
             guard let attr = attribute.as(AttributeSyntax.self),
@@ -245,7 +244,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             }
 
             for argument in arguments {
-                // 最初の無名引数、または name: ラベル付き引数
+                // Takes the first string literal regardless of label, so both the unlabelled
+                // form and a labelled one are accepted.
                 if let stringLiteral = argument.expression.as(StringLiteralExprSyntax.self),
                    let segment = stringLiteral.segments.first?.as(StringSegmentSyntax.self) {
                     return segment.content.text
@@ -282,7 +282,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
     }
 
-    /// additionalHeaders プロパティを生成
+    /// Emits `additionalHeaders`, skipping optional properties that are nil at call time.
     private static func generateAdditionalHeadersProperty(for properties: [PropertyInfo]) -> DeclSyntax {
         if properties.isEmpty {
             return "public var additionalHeaders: [String: String] { [:] }"
@@ -322,7 +322,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         case "Date":
             return "Self.encodeDate(\(prop.name))"
         default:
-            // RawRepresentable (enum) と仮定
+            // Assumed to be RawRepresentable. If it is not, the generated code fails to compile
+            // at the use site rather than being diagnosed here.
             return "\(prop.name).rawValue"
         }
     }
@@ -370,7 +371,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         """)
     }
 
-    /// サーバーサイドデコーディング用のdecodeメソッドを生成
+    /// Emits the `decode` the server uses to rebuild the input from a raw request.
     private static func generateDecodeMethod(for properties: [PropertyInfo]) -> DeclSyntax {
         if properties.isEmpty {
             return """
@@ -393,7 +394,6 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         lines.append("    decoder: any APIBodyDecoder")
         lines.append(") throws -> Self {")
 
-        // 各プロパティをデコード
         for prop in properties {
             switch prop.kind {
             case .pathParam:
@@ -403,12 +403,12 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             case .body:
                 lines.append(generateBodyDecoding(for: prop))
             case .header:
-                // ヘッダーはサーバーサイドデコードには含まない
                 break
             }
         }
 
-        // イニシャライザを呼び出し
+        // Every property is passed, including headers, which have no local binding here — callers
+        // must have filtered header properties out before calling.
         let initArgs = properties.map { "\($0.name): \($0.name)" }.joined(separator: ", ")
         lines.append("    return Self(\(initArgs))")
         lines.append("}")
@@ -416,7 +416,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         return DeclSyntax(stringLiteral: lines.joined(separator: "\n"))
     }
 
-    /// パスパラメータのデコーディングコードを生成
+    /// Emits the decoding for one path parameter. A missing non-optional one throws.
     private static func generatePathParamDecoding(for prop: PropertyInfo) -> String {
         let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
 
@@ -428,14 +428,14 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
             }
         } else {
             if baseType == "String" {
-                // String型の場合は変換不要
                 return """
                     guard let \(prop.name) = pathParameters["\(prop.name)"] else {
                         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Missing path parameter: \(prop.name)"))
                     }
                 """
             } else {
-                // 他の型は変換が必要
+                // A value that is present but unparsable reports the same "missing" message as an
+                // absent one, so a 400 here does not say which of the two happened.
                 return """
                     guard let \(prop.name)String = pathParameters["\(prop.name)"],
                           let \(prop.name) = \(generateValueConversion(from: "\(prop.name)String", to: baseType)) else {
@@ -446,7 +446,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    /// クエリパラメータのデコーディングコードを生成
+    /// Emits the decoding for one query parameter, honouring optionality and any default value.
     private static func generateQueryParamDecoding(for prop: PropertyInfo) -> String {
         let baseType = prop.typeName.replacingOccurrences(of: "?", with: "")
 
@@ -480,7 +480,7 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    /// ボディのデコーディングコードを生成
+    /// Emits the decoding for the request body. An optional body decodes a missing body to nil.
     private static func generateBodyDecoding(for prop: PropertyInfo) -> String {
         if prop.isOptional {
             return """
@@ -501,7 +501,10 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         }
     }
 
-    /// 文字列から型への変換コードを生成
+    /// Emits the expression that parses a string back into the property's declared type.
+    ///
+    /// The inverse of the client-side conversion, and the two lists must stay in step: a type
+    /// handled by only one of them round-trips wrongly rather than failing to build.
     private static func generateValueConversion(from source: String, to typeName: String) -> String {
         switch typeName {
         case "String":
@@ -521,7 +524,8 @@ public struct EndpointMacro: MemberMacro, ExtensionMacro {
         case "Date":
             return "ISO8601DateFormatter().date(from: \(source))"
         default:
-            // RawRepresentable (enum) と仮定
+            // Assumed to be RawRepresentable. If it is not, the generated code fails to compile
+            // at the use site rather than being diagnosed here.
             return "\(typeName)(rawValue: \(source))"
         }
     }

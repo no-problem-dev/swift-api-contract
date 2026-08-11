@@ -1,22 +1,21 @@
 import Foundation
 
-/// ストリーミングAPIルート登録プロトコル
+/// The server-side adapter for streaming endpoints, which a group's `registerAll(_:)` does not cover.
 ///
-/// `APIRouteRegistrar`が通常のリクエスト-レスポンス型なのに対し、
-/// `StreamingRouteRegistrar`はストリーミングエンドポイントを登録する。
+/// `APIRouteRegistrar` handles request/response routes; streaming ones are registered here, one
+/// call each, because the macro leaves them out of the generated bulk registration.
 public protocol StreamingRouteRegistrar: Sendable {
     associatedtype Group: APIContractGroup
     associatedtype Service: APIService where Service.Group == Group
 
     var service: Service { get }
 
-    /// ストリーミングエンドポイントを登録
-    ///
-    /// ハンドラーはAsyncStreamを返し、イベントがストリーミングされる。
+    /// Mounts one streaming endpoint.
     ///
     /// - Parameters:
-    ///   - endpoint: エンドポイント型
-    ///   - handler: ストリームを返すハンドラー
+    ///   - endpoint: The endpoint type to serve.
+    ///   - handler: Produces the event stream for a request. It returns as soon as the stream
+    ///              exists, so the work that fills it runs after the handler is done.
     @discardableResult
     func register<Endpoint: StreamingAPIContract>(
         _ endpoint: Endpoint.Type,

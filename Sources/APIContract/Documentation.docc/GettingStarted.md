@@ -1,6 +1,6 @@
-# はじめに
+# Getting Started
 
-APIContractを使用してAPIエンドポイントを定義・実行する基本ガイド。
+Define a group of endpoints, call them from a client, and serve them from the same declaration.
 
 @Metadata {
     @PageColor(blue)
@@ -8,88 +8,18 @@ APIContractを使用してAPIエンドポイントを定義・実行する基本
 
 ## Overview
 
-APIContractを使用してAPIエンドポイントを定義し、実行する基本的な方法を解説する。
+This walks through one API end to end. The point to keep in view is that the group below is the
+only place the endpoints are described — the client code and the server code that follow both read
+from it, and neither can drift from it without failing to compile.
 
-## インストール
+## Defining a group
 
-Swift Package Managerで追加する。
-
-```swift
-dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "2.1.2")
-]
-```
-
-ターゲットに追加：
-
-```swift
-.target(
-    name: "YourTarget",
-    dependencies: [
-        .product(name: "APIContract", package: "swift-api-contract")
-    ]
-)
-```
-
-## 基本的なエンドポイント定義
-
-### シンプルなGETエンドポイント
-
-最もシンプルなエンドポイントは、パラメータなしのGETリクエスト。
+Related endpoints live inside an enum marked with `@APIGroup`. The group carries what they share:
+a base path, an auth scheme, and any headers or scopes that apply to all of them.
 
 ```swift
 import APIContract
 
-@Endpoint(.get)
-struct ListUsers {
-    typealias Output = [User]
-}
-```
-
-### パスパラメータを持つエンドポイント
-
-パスパラメータは`@PathParam`でマークする。
-
-```swift
-@Endpoint(.get, path: ":userId")
-struct GetUser {
-    @PathParam var userId: String
-    typealias Output = User
-}
-```
-
-### クエリパラメータを持つエンドポイント
-
-クエリパラメータは`@QueryParam`でマークする。
-
-```swift
-@Endpoint(.get)
-struct SearchUsers {
-    @QueryParam var query: String
-    @QueryParam var limit: Int?
-    @QueryParam(name: "page_size") var pageSize: Int?  // カスタム名
-
-    typealias Output = [User]
-}
-```
-
-### リクエストボディを持つエンドポイント
-
-リクエストボディは`@Body`でマークする。
-
-```swift
-@Endpoint(.post)
-struct CreateUser {
-    @Body var body: CreateUserRequest
-    typealias Output = User
-}
-```
-
-## APIグループの定義
-
-関連するエンドポイントは`@APIGroup`でグループ化できる。
-
-```swift
 @APIGroup(path: "/v1/users", auth: .bearer)
 enum UsersAPI {
     @Endpoint(.get)
@@ -118,12 +48,17 @@ enum UsersAPI {
 }
 ```
 
-## エンドポイントの実行
+Each nested struct is a whole endpoint: the attributes decide where a value travels, and `Output`
+names what comes back. `Delete` returns `EmptyOutput` because the response has no body — that also
+selects the `execute` overload that returns nothing.
 
-### APIExecutableの実装
+For the attribute-by-attribute detail, and the parameter types that can be converted, see
+<doc:DefiningEndpoints>.
 
-`APIExecutable` プロトコルを実装したクライアントを作成する。
-実装が必要なのは `executeWithResponse` のみ。`execute` の各オーバーロードはデフォルト実装が提供される。
+## Implementing a client
+
+No transport ships with this package, so the first step is one conformance to ``APIExecutable``.
+Only `executeWithResponse(_:)` needs writing; the `execute(_:)` overloads come from an extension.
 
 ```swift
 struct MyAPIClient: APIExecutable {
@@ -135,36 +70,71 @@ struct MyAPIClient: APIExecutable {
     {
         let request = try contract.buildRequest(baseURL: baseURL)
         let (data, response) = try await session.data(for: request)
-        let httpResponse = response as! HTTPURLResponse
-        let headers = httpResponse.allHeaderFields
-            .compactMapValues { $0 as? String }
-            .reduce(into: [String: String]()) { $0[$1.key as! String] = $1.value }
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        let headers = httpResponse.allHeaderFields.reduce(into: [String: String]()) { result, pair in
+            if let key = pair.key as? String, let value = pair.value as? String {
+                result[key] = value
+            }
+        }
         let output = try JSONDecoder().decode(E.Output.self, from: data)
         return APIResponse(output: output, statusCode: httpResponse.statusCode, headers: headers)
     }
 }
 ```
 
-### リクエストの実行
+`buildRequest(baseURL:)` does the assembly — path substitution, query items, body encoding, group
+and endpoint headers. What is left to the client is the part that is genuinely yours: retries,
+authentication, and how a non-2xx response becomes an error.
+
+## Making calls
+
+An endpoint value is both the description of the call and its arguments, so there is nothing to
+wire up at the call site.
 
 ```swift
-let client: any APIExecutable = MyAPIClient(
-    baseURL: URL(string: "https://api.example.com")!,
-    session: .shared
-)
+let client = MyAPIClient(baseURL: URL(string: "https://api.example.com")!, session: .shared)
 
-// ユーザー一覧を取得
 let users = try await UsersAPI.List(limit: 10).execute(using: client)
-
-// 特定のユーザーを取得
 let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
-// 新しいユーザーを作成
-let newUser = try await UsersAPI.Create(
-    body: CreateUserRequest(name: "田中", email: "tanaka@example.com")
+let created = try await UsersAPI.Create(
+    body: CreateUserRequest(name: "Ada", email: "ada@example.com")
 ).execute(using: client)
+
+try await UsersAPI.Delete(userId: "123").execute(using: client)
 ```
 
-## 次のステップ
+When the status code or the response headers matter — a rate-limit budget, a pagination cursor —
+call `executeWithResponse(_:)` instead and read them off ``APIResponse``.
 
-- <doc:DefiningEndpoints> - より詳細なエンドポイント定義の方法
+## Serving the same definition
+
+`@APIGroup` also emits a protocol named after the group, with one `handle(_:context:)` requirement
+per endpoint. Implementing it is how a server proves it covers the whole group: leaving an
+endpoint out is a compile error.
+
+```swift
+struct UsersService: UsersAPIService {
+    func handle(_ input: UsersAPI.List, context: ServiceContext) async throws -> [User] { … }
+    func handle(_ input: UsersAPI.Get, context: ServiceContext) async throws -> User { … }
+    func handle(_ input: UsersAPI.Create, context: ServiceContext) async throws -> User { … }
+    func handle(_ input: UsersAPI.Delete, context: ServiceContext) async throws { … }
+}
+```
+
+The inputs arrive already decoded, because the same macro that generated the client's encoding
+generated the matching decoding. Registering the routes is one call per group, against your
+``APIRouteRegistrar`` conformance:
+
+```swift
+UsersAPI.registerAll(registrar)
+```
+
+Streaming endpoints are not included in that call — register those through
+``StreamingRouteRegistrar``.
+
+## Next steps
+
+- <doc:DefiningEndpoints> — every attribute, the supported parameter types, and streaming
