@@ -7,6 +7,20 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- `EmptyOutput`'s documentation no longer claims it "decodes from any payload, including an empty
+  one". The first half is true; the second never was. A parser reads the payload before any
+  `Decodable` type is asked for a value, and on zero bytes it fails at the end of the input, so
+  `init(from:)` is never reached — no output type can make a bodiless response decode. The doc now
+  says that recognising a bodiless response, and skipping the decode instead, is the client's job.
+- Note for whoever opens this package next: the protocol that expresses "this output has a value
+  for a missing body" (`EmptyBodyDecodable`) currently lives in swift-api-client and belongs here
+  instead, because a contract package depends on this package and not on the client — `now-my-task`'s
+  `Packages/Shared` is the working example — so an empty output type declared in a contract module
+  cannot conform to it without importing the client. Not moved yet: the client release that
+  introduces the protocol is still unpublished, and moving it would change both packages at once.
+
 ## [2.1.3] - 2026-07-19
 
 ### Changed
