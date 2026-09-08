@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.4] - 2026-09-08
+
 ### Changed
 - README の Swift 版表記を実態（`swift-tools-version: 6.2`）に合わせた。6.0 のツールチェインでは解決すらできない
 

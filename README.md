@@ -48,7 +48,7 @@ Swift 6.2+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "2.1.2")
+    .package(url: "https://github.com/no-problem-dev/swift-api-contract.git", from: "2.0.0")
 ]
 ```
 
