@@ -4,7 +4,7 @@
 
 HTTP API を Swift で一度書けば、クライアントとサーバーが同じ定義を共有する。エンドポイント・パラメータ・エラーが両側でコンパイラに検査される。
 
-![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)
+![Swift 6.2+](https://img.shields.io/badge/Swift-6.2+-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ## 概要
@@ -41,7 +41,7 @@ let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
 ## 動作環境
 
-Swift 6.0+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
+Swift 6.2+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
 
 ## インストール
 

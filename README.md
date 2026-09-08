@@ -4,7 +4,7 @@ English | [日本語](./README.ja.md)
 
 Define an HTTP API once in Swift, and let the client and the server share it — endpoints, parameters and errors are checked by the compiler on both sides.
 
-![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)
+![Swift 6.2+](https://img.shields.io/badge/Swift-6.2+-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ## Overview
@@ -42,7 +42,7 @@ defining endpoints, implementing a client, and serving the same definitions.
 
 ## Requirements
 
-Swift 6.0+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
+Swift 6.2+ · iOS 17+ / macOS 14+ / tvOS 17+ / watchOS 10+ · Linux
 
 ## Installation
 

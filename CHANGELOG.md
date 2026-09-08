@@ -8,6 +8,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- README の Swift 版表記を実態（`swift-tools-version: 6.2`）に合わせた。6.0 のツールチェインでは解決すらできない
 
 - `EmptyOutput`'s documentation no longer claims it "decodes from any payload, including an empty
   one". The first half is true; the second never was. A parser reads the payload before any
