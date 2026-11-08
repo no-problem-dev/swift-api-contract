@@ -37,7 +37,7 @@ let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
 ## Documentation
 
-[API reference and guides](https://no-problem-dev.github.io/swift-api-contract/documentation/apicontract/) —
+[API reference and guides](Sources/APIContract/Documentation.docc) —
 defining endpoints, implementing a client, and serving the same definitions.
 
 ## Requirements
