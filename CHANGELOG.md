@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.5] - 2026-11-08
+
+### Changed
+
+- swift-docc-plugin への依存を外した（DocC は Xcode で開く）
+
 ## [2.1.4] - 2026-09-08
 
 ### Changed
@@ -220,7 +226,8 @@ Re-tag of 2.1.0. No source changes.
 
 - **Tests**: macro expansion tests (EndpointMacroTests)
 
-[Unreleased]: https://github.com/no-problem-dev/swift-api-contract/compare/2.1.3...HEAD
+[Unreleased]: https://github.com/no-problem-dev/swift-api-contract/compare/2.1.5...HEAD
+[2.1.5]: https://github.com/no-problem-dev/swift-api-contract/compare/2.1.4...2.1.5
 [2.1.3]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.1.2...2.1.3
 [2.1.2]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/no-problem-dev/swift-api-contract/compare/v2.1.0...v2.1.1
