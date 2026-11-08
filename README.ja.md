@@ -36,7 +36,7 @@ let user = try await UsersAPI.Get(userId: "123").execute(using: client)
 
 ## ドキュメント
 
-[API リファレンスとガイド](https://no-problem-dev.github.io/swift-api-contract/documentation/apicontract/) —
+[API リファレンスとガイド](Sources/APIContract/Documentation.docc) —
 エンドポイントの定義、クライアントの実装、同じ定義でサーバーを動かす方法。
 
 ## 動作環境
